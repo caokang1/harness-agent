@@ -1,0 +1,25 @@
+# 构建产物
+dist/
+
+# 维护者脚本与配置（内部用，不需发布到 npm）
+scripts/
+build-installer.sh
+bootstrap.sh
+uninstall.sh
+
+# IDE / 项目文件
+harness-starter.iml
+*.iml
+.idea/
+
+# 设计/维护者文档（npm 包里只保留 README / INSTALL / CUSTOMIZE）
+docs/
+design.md
+SYNC.md
+
+# git
+.git/
+.gitignore
+
+# Node（如果本地跑过 npm install）
+node_modules/

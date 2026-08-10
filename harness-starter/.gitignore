@@ -1,0 +1,28 @@
+# Harness Starter Kit · ignore 规则
+# 本仓库只存源码/文档/模板，不存任何生成物。
+
+# macOS
+.DS_Store
+
+# Editors
+.idea/
+.vscode/
+*.swp
+*~
+
+# 临时文件
+*.bak
+*.tmp
+
+# 使用方可能在本地做 dry-run 测试产出的临时目录
+/dry-run-output/
+/tmp-test/
+
+# 季度对账脚本产出的报告（阶段 2）
+/quarterly-report-*.md
+
+# build-installer 生成物（dist/install.sh 不入库，上传到 MinIO 分发）
+/dist/
+
+# 本地 MinIO 上传配置（含凭据，绝不入库）
+scripts/.env.build

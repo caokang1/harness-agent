@@ -1,0 +1,40 @@
+{
+  "name": "@your-org/harness-starter",
+  "version": "1.1.2",
+  "description": "AI Agent 工程脚手架 — 为 Java/Vue 项目安装 Harness 工程方法论（AGENTS.md / RULES / skill / dev.sh）",
+  "keywords": [
+    "harness",
+    "starter",
+    "agent",
+    "scaffold",
+    "springboot",
+    "vue",
+    "cursor",
+    "claude"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=16"
+  },
+  "bin": {
+    "harness-starter": "bin/cli.js"
+  },
+  "files": [
+    "bin/",
+    "tier1-direct/",
+    "tier1-direct-optional/",
+    "tier2-template/",
+    "scripts/detect-project.sh",
+    "init.sh",
+    "README.md",
+    "INSTALL.md",
+    "CUSTOMIZE.md"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://git.example.com/your-group/harness-starter.git"
+  },
+  "publishConfig": {
+    "registry": "https://npm.example.com/"
+  }
+}

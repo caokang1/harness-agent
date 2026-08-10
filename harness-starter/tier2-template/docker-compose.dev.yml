@@ -1,0 +1,73 @@
+# {{PROJECT_NAME}} 开发环境 docker-compose
+# 来源：harness-starter / Tier 2 模板
+#
+# 使用：bash dev.sh start
+#
+# 占位符（init.sh 替换）：
+#   {{PROJECT_NAME}}      项目名（用于服务名）
+#   {{BACKEND_PORT}}      后端端口（默认 8080）
+#   {{FRONTEND_PORT}}     前端端口（默认 5173）
+#   {{ENTRY_MODULE}}      Spring Boot 入口模块（如 myservice-start）
+#   {{FRONTEND_DIR}}      前端仓库相对路径（如 ../my-service-ui）
+#   {{JDK_IMAGE}}         JDK 镜像（如 gradle:8.12-jdk21）
+
+services:
+
+  # ============================================================
+  # 后端：Spring Boot + Gradle bootRun（DevTools 热重载）
+  # ============================================================
+  {{PROJECT_NAME}}-dev:
+    image: {{JDK_IMAGE}}
+    container_name: {{PROJECT_NAME}}-dev
+    working_dir: /workspace
+    volumes:
+      - ./:/workspace
+      # Gradle 缓存（避免每次重启重新下载依赖）
+      - {{PROJECT_NAME}}-gradle-cache:/root/.gradle
+    ports:
+      - "{{BACKEND_PORT}}:8080"
+    env_file:
+      - .env
+    environment:
+      - JAVA_TOOL_OPTIONS=-XX:-OmitStackTraceInFastThrow
+      - SPRING_DEVTOOLS_RESTART_ENABLED=true
+    command: >
+      bash -c "
+        cd /workspace &&
+        gradle :{{ENTRY_MODULE}}:bootRun --no-daemon
+      "
+    networks:
+      - {{PROJECT_NAME}}-net
+
+  # ============================================================
+  # 前端：Vue 3 + Vite dev server (HMR)
+  # ============================================================
+  {{PROJECT_NAME}}-ui-dev:
+    image: node:20-alpine
+    container_name: {{PROJECT_NAME}}-ui-dev
+    working_dir: /workspace
+    volumes:
+      - {{FRONTEND_DIR}}:/workspace
+      - {{PROJECT_NAME}}-npm-cache:/root/.npm
+    ports:
+      - "{{FRONTEND_PORT}}:5173"
+    command: >
+      sh -c "
+        cd /workspace &&
+        npm install &&
+        npm run dev -- --host 0.0.0.0
+      "
+    networks:
+      - {{PROJECT_NAME}}-net
+
+# ============================================================
+# 卷与网络
+# ============================================================
+
+volumes:
+  {{PROJECT_NAME}}-gradle-cache:
+  {{PROJECT_NAME}}-npm-cache:
+
+networks:
+  {{PROJECT_NAME}}-net:
+    driver: bridge
