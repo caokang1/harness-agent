@@ -1,0 +1,78 @@
+{
+  "project": "示例商城",
+  "repo": "../repo",
+  "scan": {
+    "skip_dirs": [
+      "target",
+      ".git",
+      "node_modules",
+      "test"
+    ],
+    "feign_shallow_levels": 3
+  },
+  "modules": {
+    "external": [
+      "admin-web"
+    ],
+    "shared": [
+      "common"
+    ]
+  },
+  "cdc": {
+    "table_ref_type": "TableRef",
+    "registry_class": "CdcTables",
+    "check_method": "matches",
+    "topic_marker": "cdc."
+  },
+  "databases": {
+    "infra": [
+      "xxl_job"
+    ],
+    "report": [
+      "shop_report"
+    ],
+    "report_tables_outside": [],
+    "verify_log_tables": [
+      "shop_report.report_check_log"
+    ],
+    "mapper_package_db": {
+      "order": "shop_order",
+      "member": "shop_member",
+      "stock": "shop_stock",
+      "report": "shop_report"
+    },
+    "module_db": {
+      "order-service": "shop_order",
+      "member-service": "shop_member",
+      "stock-service": "shop_stock",
+      "report-service": "shop_report"
+    },
+    "business_db_labels": {
+      "shop_order": "订单（业务库）",
+      "shop_member": "会员与门店（业务库）",
+      "shop_stock": "库存（业务库）"
+    }
+  },
+  "er": {
+    "core_tables": [
+      "shop_order.orders",
+      "shop_order.order_item",
+      "shop_order.refund",
+      "shop_member.member",
+      "shop_member.store",
+      "shop_stock.stock",
+      "shop_stock.stock_log"
+    ],
+    "column_alias": {
+      "order_id": "orders"
+    },
+    "db_order": [
+      "shop_order",
+      "shop_member",
+      "shop_stock"
+    ]
+  },
+  "page": {
+    "title": "示例商城 库表血缘"
+  }
+}

@@ -59,10 +59,11 @@ harness-starter/
 │   ├── .learnings/                 ← 索引模板 + 24 类 Tag 词典 + 子文件骨架
 │   └── openspec/templates/         ← 四件套模板：proposal/design/tasks/TRACE
 │
-├── tier1-direct-optional/          ← 可选，需 --include-frontend-design 启用
+├── tier1-direct-optional/          ← 可选，按开关安装
 │   └── .claude/skills/
-│       ├─ frontend-design          ← 前端页面/组件/海报设计 skill
-│       └─ ui-ux-pro-max            ← UI/UX 设计智能（50 styles / 21 palettes ...）
+│       ├─ frontend-design          ← 前端页面/组件/海报设计 skill（--include-frontend-design）
+│       ├─ ui-ux-pro-max            ← UI/UX 设计智能（50 styles / 21 palettes ...）（同上）
+│       └─ table-lineage            ← 库表血缘页面：表由谁写、从哪取数、谁在读（--include-table-lineage，需 Python 3.11+）
 │
 └── tier2-template/                 ← 含占位符，按项目改
     ├── AGENTS.md                   ← 入口契约（{{PROJECT_NAME}} 等）
@@ -95,6 +96,7 @@ npx --registry=https://npm.example.com/ -y @your-org/harness-starter --auto
 # 同上：扫 7 个字段 → 交互确认 → 安装
 # CI：加 --yes；只看扫描结果：加 --dry-run
 # 前端 UI skill：npx … @your-org/harness-starter --auto --include-frontend-design
+# 库表血缘 skill：npx … @your-org/harness-starter --auto --include-table-lineage
 ```
 
 包名：`@your-org/harness-starter`；**请用私库 `latest`（当前 ≥1.1.1）**，含 Gradle 多行 `include 'mod'` 模块扫描修复。

@@ -1,0 +1,131 @@
+{
+ "_meta": {
+  "label": "示例 7 张",
+  "kind": "holdout",
+  "precision": true,
+  "commit": "",
+  "reviewed_at": "2025-01-02",
+  "_note": "示例项目的标准答案：代码是按这份答案设计的，所以它就是事实。真实项目里这份文件来自人工逐张读代码，见 references/ground-truth.md。"
+ },
+ "daily_sales": {
+  "rt": true,
+  "jobs": [],
+  "src": [
+   "orders"
+  ],
+  "ext": [
+   "/admin/report/daily"
+  ],
+  "int": true,
+  "fp": {
+   "report-service:DailySalesService.refresh": "764a99771497",
+   "report-service:DailySalesListener.onMessage": "24da39d5e20a",
+   "report-service|com.example.shop.report.mapper.DailySalesMapper.upsert": "1711526d470e"
+  },
+  "commit": "v1",
+  "reviewed_at": "2025-01-02",
+  "src_feign": [
+   "order_item"
+  ]
+ },
+ "member_sales": {
+  "rt": false,
+  "jobs": [
+   "/job/member-sales"
+  ],
+  "src": [
+   "daily_sales",
+   "store"
+  ],
+  "ext": [
+   "/admin/report/member"
+  ],
+  "int": false,
+  "fp": {
+   "report-service|com.example.shop.report.mapper.MemberSalesMapper.deleteByMonth": "d17ef41b2bb9",
+   "report-service:MemberSalesJobController.memberSales": "c3786201d343",
+   "report-service|com.example.shop.report.mapper.MemberSalesMapper.insert": "da39a3ee5e6b",
+   "report-service:MemberSalesService.rebuild": "5e3198b1e75d"
+  },
+  "commit": "v1",
+  "reviewed_at": "2025-01-02",
+  "src_feign": [
+   "member"
+  ]
+ },
+ "refund_daily": {
+  "rt": true,
+  "jobs": [],
+  "src": [
+   "refund"
+  ],
+  "ext": [],
+  "int": false,
+  "fp": {
+   "report-service:RefundDailyListener.onMessage": "db9eec380301",
+   "report-service|com.example.shop.report.mapper.RefundDailyMapper.increase": "27bdd5b48ecd"
+  },
+  "commit": "v1",
+  "reviewed_at": "2025-01-02"
+ },
+ "stock_alert": {
+  "rt": false,
+  "jobs": [
+   "stockAlertJob"
+  ],
+  "src": [
+   "alert_rule"
+  ],
+  "ext": [],
+  "int": false,
+  "fp": {
+   "report-service:StockAlertTask.run": "e68432e20973",
+   "report-service|com.example.shop.report.mapper.StockAlertMapper.insertAlerts": "62dab79e3a6c"
+  },
+  "commit": "v1",
+  "reviewed_at": "2025-01-02",
+  "src_feign": [
+   "stock"
+  ]
+ },
+ "alert_rule": {
+  "rt": false,
+  "jobs": [],
+  "src": [],
+  "ext": [],
+  "int": true,
+  "fp": {},
+  "commit": "v1",
+  "reviewed_at": "2025-01-02"
+ },
+ "old_promo_stat": {
+  "rt": false,
+  "jobs": [],
+  "src": [],
+  "ext": [],
+  "int": false,
+  "fp": {
+   "report-service|com.example.shop.report.mapper.PromoStatMapper.increase": "d12e71297ec2",
+   "report-service:PromoStatListener.onMessage": "296106155d7d"
+  },
+  "commit": "v1",
+  "reviewed_at": "2025-01-02"
+ },
+ "report_check_log": {
+  "rt": false,
+  "jobs": [
+   "dailySalesVerifyJob"
+  ],
+  "src": [
+   "daily_sales"
+  ],
+  "ext": [],
+  "int": false,
+  "fp": {
+   "report-service:DailySalesVerifyTask.verify": "e6545518162e",
+   "report-service|com.example.shop.report.mapper.ReportCheckMapper.log": "5fedb2450930"
+  },
+  "commit": "v1",
+  "reviewed_at": "2025-01-02"
+ }
+}

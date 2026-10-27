@@ -1,0 +1,1 @@
+{"_doc": "口径卡片：key 是表名（不带库名）。格式见 references/cards.md。fp/commit/reviewed_at 由 tools/rebaseline.py 盖章，不要手写。"}

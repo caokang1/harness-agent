@@ -1,0 +1,21 @@
+[
+ {
+  "set": "1_demo",
+  "label": "示例 7 张",
+  "counts": {
+   "n": 7,
+   "rt_ok": 7,
+   "int_ok": 7,
+   "jobs_hit": 3,
+   "jobs_all": 3,
+   "ext_hit": 2,
+   "ext_all": 2,
+   "src_all": 6,
+   "src_any_all": 9,
+   "src_direct": 6,
+   "src_any": 9,
+   "p_found": 6,
+   "p_extra": 0
+  }
+ }
+]

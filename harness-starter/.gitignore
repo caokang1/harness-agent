@@ -27,6 +27,9 @@
 # 本地 MinIO 上传配置（含凭据，绝不入库）
 scripts/.env.build
 
+# table-lineage 示例项目跑 selftest / run.py 产生的结果
+tier1-direct-optional/.claude/skills/table-lineage/assets/demo/workspace/runs/
+
 # Python 缓存
 __pycache__/
 *.pyc

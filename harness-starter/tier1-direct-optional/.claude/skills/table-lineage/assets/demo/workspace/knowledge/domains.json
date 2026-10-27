@@ -1,0 +1,44 @@
+{
+ "domains": {
+  "销售": [
+   "daily_sales",
+   "member_sales",
+   "refund_daily",
+   "sales_month",
+   "store"
+  ],
+  "库存": [
+   "stock_alert",
+   "alert_rule"
+  ],
+  "运维": [
+   "report_check_log",
+   "old_promo_stat"
+  ]
+ },
+ "reviewed_groups": {},
+ "descriptions": [
+  [
+   "销售",
+   "卖了多少、谁买的"
+  ],
+  [
+   "库存",
+   "哪些商品快没货了"
+  ],
+  [
+   "运维",
+   "报表自身的核对与历史遗留"
+  ]
+ ],
+ "rules": [
+  [
+   "sales|refund|order",
+   "销售"
+  ],
+  [
+   "stock|alert",
+   "库存"
+  ]
+ ]
+}

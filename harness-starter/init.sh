@@ -33,6 +33,8 @@
 #                               frontend-dir / backend-port，进入交互式确认界面
 #   --yes                       配合 --auto 使用，跳过交互直接采用扫描结果（CI 用）
 #   --dry-run                   配合 --auto 使用，只输出扫描结果后退出，不装任何文件
+#   --include-table-lineage     额外安装 table-lineage 库表血缘 skill（Java + MyBatis + MySQL
+#                               项目梳理"表从哪来、到哪去"；需要 Python 3.11+）
 #   --include-frontend-design   额外安装 frontend-design / ui-ux-pro-max 2 个前端 UI 设计 skill
 #                               （纯后端项目可不加；前端占比高的项目建议加）
 #
@@ -44,7 +46,7 @@
 #
 # 行为：
 #   1. 把 tier1-direct/（18 个通用 skill + SOP + learnings + 模板）移到项目根
-#   2. 按 --include-frontend-design 可选移入 tier1-direct-optional/（2 个前端 skill）
+#   2. 按 --include-frontend-design / --include-table-lineage 可选移入 tier1-direct-optional/ 里对应的 skill
 #   3. 把 tier2-template/（AGENTS.md / RULES / dev.sh / 1 个项目特异 skill）移到项目根
 #   4. 把本次写入文件里的 {{PLACEHOLDER}} 替换为参数值（用户原有的同名文件不碰）
 #   5. 给 dev.sh 加可执行权限
@@ -67,6 +69,7 @@ JDK_IMAGE="gradle:8.12-jdk21"
 PROJECT_DESC="Replace this with one-line project description"
 APP_MAIN_CLASS="ApplicationStarter"
 INCLUDE_FRONTEND_DESIGN=0   # --include-frontend-design 开启后把 D 的 2 个前端/UI skill 一起装上
+INCLUDE_TABLE_LINEAGE=0     # --include-table-lineage 开启后装 D 的库表血缘 skill
 AUTO=0                      # --auto：开启项目现场自动扫描
 YES=0                       # --yes ：跳过交互直接采用扫描结果
 DRY_RUN=0                   # --dry-run：只打印扫描结果后退出
@@ -89,6 +92,7 @@ for arg in "$@"; do
     --project-desc=*)          PROJECT_DESC="${arg#*=}" ;;
     --app-main-class=*)        APP_MAIN_CLASS="${arg#*=}";     EXPLICIT_APP_MAIN_CLASS=1 ;;
     --include-frontend-design) INCLUDE_FRONTEND_DESIGN=1 ;;
+    --include-table-lineage)   INCLUDE_TABLE_LINEAGE=1 ;;
     --auto)                    AUTO=1 ;;
     --yes)                     YES=1 ;;
     --dry-run)                 DRY_RUN=1 ;;
@@ -335,22 +339,32 @@ _merge_dir "${SCRIPT_DIR}/tier1-direct/openspec/templates"   "${TARGET_DIR}/open
 TIER1_COUNT=$(ls -1 "${TARGET_DIR}/.claude/skills" 2>/dev/null | wc -l)
 echo "  ✅ Tier 1 必装已就位（${TIER1_COUNT} 个 skill）"
 
-# --- 1b. Tier 1 可选（D：前端/UI 设计 skill）---
+# --- 1b. Tier 1 可选（每组 skill 由各自的开关决定装不装）---
+_install_optional() {
+  local name
+  for name in "$@"; do
+    if [ ! -d "${SCRIPT_DIR}/tier1-direct-optional/.claude/skills/${name}" ]; then
+      echo "  ⚠️  起步包里没有 ${name}，跳过"
+    elif [ -e "${TARGET_DIR}/.claude/skills/${name}" ]; then
+      echo "  ⚠️  ${name} 已存在，跳过"
+    else
+      _merge_dir "${SCRIPT_DIR}/tier1-direct-optional/.claude/skills/${name}" "${TARGET_DIR}/.claude/skills"
+      echo "  ✅ ${name}"
+    fi
+  done
+}
+
 if [ "$INCLUDE_FRONTEND_DESIGN" -eq 1 ]; then
   echo "[1b/3] 移动 Tier 1 可选（前端/UI 设计 skill）..."
-  if [ -d "${SCRIPT_DIR}/tier1-direct-optional/.claude/skills" ]; then
-    for d in "${SCRIPT_DIR}/tier1-direct-optional/.claude/skills/"*/; do
-      name="$(basename "$d")"
-      if [ -e "${TARGET_DIR}/.claude/skills/${name}" ]; then
-        echo "  ⚠️  ${name} 已存在，跳过"
-      else
-        _merge_dir "${d%/}" "${TARGET_DIR}/.claude/skills"
-        echo "  ✅ ${name}"
-      fi
-    done
-  fi
+  _install_optional frontend-design ui-ux-pro-max
 else
-  echo "[1b/3] 跳过 Tier 1 可选（未加 --include-frontend-design；如需前端/UI 设计 skill，按 CUSTOMIZE.md §D 手动安装）"
+  echo "[1b/3] 跳过前端/UI 设计 skill（需要时加 --include-frontend-design，见 CUSTOMIZE.md §D）"
+fi
+if [ "$INCLUDE_TABLE_LINEAGE" -eq 1 ]; then
+  echo "[1b/3] 移动 Tier 1 可选（库表血缘 skill，需 Python 3.11+）..."
+  _install_optional table-lineage
+else
+  echo "[1b/3] 跳过库表血缘 skill（需要时加 --include-table-lineage，见 CUSTOMIZE.md §D）"
 fi
 
 # --- 2. 复制 Tier 2（带占位符）---
@@ -441,6 +455,7 @@ MANIFEST_FILE="${TARGET_DIR}/.harness-starter-manifest"
   echo "BACKEND_PACKAGE=$BACKEND_PACKAGE"
   echo "FRONTEND_DIR=$FRONTEND_DIR"
   echo "INCLUDE_FRONTEND_DESIGN=$INCLUDE_FRONTEND_DESIGN"
+  echo "INCLUDE_TABLE_LINEAGE=$INCLUDE_TABLE_LINEAGE"
   echo ""
   echo "Files placed:"
   echo "  AGENTS.md"

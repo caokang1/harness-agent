@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.shop.report.mapper.DailySalesMapper">
+    <insert id="upsert">
+        insert into daily_sales (day, order_count, amount) values (#{day}, 1, #{amount})
+        on duplicate key update order_count = order_count + 1, amount = amount + #{amount}
+    </insert>
+</mapper>

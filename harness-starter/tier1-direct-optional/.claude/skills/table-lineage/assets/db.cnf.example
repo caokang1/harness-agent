@@ -1,0 +1,8 @@
+# 复制成 db.cnf 再填写（db.cnf 只放在本机，不要提交、不要发给别人）。
+# 建议用只读账号：工具只查询 information_schema 和 xxl_job.xxl_job_info。
+[client]
+host=127.0.0.1
+port=3306
+user=readonly_user
+password=CHANGE_ME
+default-character-set=utf8mb4

@@ -65,9 +65,10 @@ HARNESS_SKILLS=(
   verification-before-completion
   writing-plans
   writing-skills
-  # 可选前端 skill
+  # 可选 skill
   frontend-design
   ui-ux-pro-max
+  table-lineage
 )
 LEGACY_DIRS=("docs/agents" ".learnings" "openspec/templates")
 LEGACY_FILES=("AGENTS.md" "BACKEND_RULES.md" "FRONTEND_RULES.md" "dev.sh" "docker-compose.dev.yml" "CUSTOMIZE.md")

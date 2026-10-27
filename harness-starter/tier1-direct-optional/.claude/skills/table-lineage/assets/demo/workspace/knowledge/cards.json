@@ -1,0 +1,46 @@
+{
+ "_doc": "口径卡片：key 是表名。字段说明见 references/cards.md。fp/commit/reviewed_at 由 tools/rebaseline.py 盖章。",
+ "daily_sales": {
+  "role": "按天汇总全店订单数和销售额，是会员月报的上游。",
+  "grain": "一天一行（day 唯一）",
+  "metric": "order_count：当天新增订单数（每收到一条订单变更 +1）；amount：订单明细 price × qty 之和，单位分。",
+  "use": "看每日 GMV 趋势；月度口径请用 member_sales。",
+  "risks": [
+   [
+    "订单的每次变更（包括状态更新）都会让 order_count +1，不是去重后的订单数。",
+    true
+   ],
+   [
+    "store_id 列从未被写入，按门店拆分会全部为空。",
+    true
+   ]
+  ],
+  "fp": {
+   "report-service:DailySalesService.refresh": "764a99771497",
+   "report-service:DailySalesListener.onMessage": "24da39d5e20a",
+   "report-service|com.example.shop.report.mapper.DailySalesMapper.upsert": "1711526d470e"
+  },
+  "commit": "v1",
+  "reviewed_at": "2025-01-02"
+ },
+ "member_sales": {
+  "role": "会员月度销售额，后台“会员销售”页面的数据源。",
+  "grain": "月份 × 会员",
+  "metric": "amount：当月 daily_sales.amount 之和；每次重算先删除整月再插入。",
+  "use": "看会员维度月度贡献。",
+  "risks": [
+   [
+    "重算时用 daily_sales 的 store_id 去查会员（MemberSalesService.rebuild 里 memberApi.getMember(d.getStoreId())），会员归属是错的。",
+    true
+   ]
+  ],
+  "fp": {
+   "report-service|com.example.shop.report.mapper.MemberSalesMapper.deleteByMonth": "d17ef41b2bb9",
+   "report-service:MemberSalesJobController.memberSales": "c3786201d343",
+   "report-service|com.example.shop.report.mapper.MemberSalesMapper.insert": "da39a3ee5e6b",
+   "report-service:MemberSalesService.rebuild": "5e3198b1e75d"
+  },
+  "commit": "v1",
+  "reviewed_at": "2025-01-02"
+ }
+}

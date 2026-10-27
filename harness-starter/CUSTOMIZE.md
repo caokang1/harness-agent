@@ -132,24 +132,27 @@
 
 ---
 
-## §D：前端/UI 设计 skill（可选安装）
+## §D：可选 skill（前端/UI 设计、库表血缘）
 
-本起步包的 `tier1-direct-optional/.claude/skills/` 下有 2 个前端相关 skill：
+本起步包的 `tier1-direct-optional/.claude/skills/` 下有 3 个可选 skill，按开关分两组安装：
 
 | Skill | 用途 | 建议 |
 |------|------|------|
 | `frontend-design` | 创建生产级前端界面（网页 / 组件 / 海报 / 仪表盘），强调独特设计语言，避免 "AI 感" | **前端占比 ≥ 30% 的项目建议启用** |
 | `ui-ux-pro-max` | UI/UX 设计智能（50 种风格、21 种配色、50 种字体组合、20 种图表、9 种 stack），集成 shadcn/ui MCP 组件搜索 | **有独立 UI/UX 设计需求才启用**（会让 AI 在 UI 设计场景介入得更深）|
+| `table-lineage` | 从 Java / Spring / MyBatis 代码加 MySQL 元数据生成可交互的库表血缘页面（谁写、从哪取数、谁在读、业务域、ER 图），准确率用人工标准答案实测 | **要梳理报表来源、做数据字典 / ER 图时启用**；需要 Python 3.11+，直连数据库还需 `mysql` 客户端；工作目录放在代码仓库外 |
+
+开关：`--include-frontend-design` 装前两个，`--include-table-lineage` 装 `table-lineage`，可以同时加。
 
 ### 启用方式（两种）
 
 **方式 1 · 安装时启用**（推荐，bootstrap / 直调都支持）：
 ```bash
 # bootstrap 推荐路径
-bash <(curl -fsSL https://.../bootstrap.sh) --include-frontend-design ...其他参数
+bash <(curl -fsSL https://.../bootstrap.sh) --include-frontend-design --include-table-lineage ...其他参数
 
 # 或直调路径
-bash .harness-starter/init.sh --include-frontend-design ...其他参数
+bash .harness-starter/init.sh --include-frontend-design --include-table-lineage ...其他参数
 ```
 
 **方式 2 · 事后补装**（bootstrap 场景已无 `.harness-starter/`，直接拉 optional 子目录即可）：

@@ -1,0 +1,5 @@
+id,job_desc,executor_handler,executor_param,schedule_conf,trigger_status
+1,会员月度销售重算,httpJobHandler,url=http://report-service/job/member-sales,0 30 1 1 * ?,1
+2,低库存告警,stockAlertJob,,0 0 * * * ?,0
+3,日销售核对,dailySalesVerifyJob,,0 0 6 * * ?,1
+4,旧的促销统计回溯,httpJobHandler,url=http://report-service/job/promo-backfill,0 0 3 * * ?,0
