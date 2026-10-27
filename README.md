@@ -1,185 +1,123 @@
 # Harness Starter Kit
 
-> 把 MCP Gateway 半年沉淀的 Harness 工程实践抽出**可复用部分**，让任何团队 30 分钟内把 AI-first 的开发流水线装到自己项目上。
+> 一条命令，把一套 **AI 协作开发规范**装进你的 Java 项目：AI 代理的工作流程、编码规则、架构检查脚本和 20 个工程方法论 skill。
+> 适用于 Claude Code、Cursor 等能读取 `.claude/skills/` 和 `AGENTS.md` 的 AI 编程工具。
 
-**仓库地址**：<https://github.com/caokang1/harness-agent>
+- **完整使用文档**：[docs/USAGE.md](docs/USAGE.md)
+- 安装细节与降级方案：[INSTALL.md](INSTALL.md)　·　安装后要改哪些字段：[CUSTOMIZE.md](CUSTOMIZE.md)
 
 ---
 
-## 这是什么
+## 它解决什么问题
 
-一份**目录树形态的起步包**（源码即内容）：带占位符和示范代码的 `tier1-direct/` / `tier2-template/`，由 `init.sh` 铺到你的项目根。它不是 SaaS、不是常驻守护进程。
+让 AI 写代码很快，但没有约束时容易出现：改一半就提交、跨模块乱依赖、改了后端忘了前端、说"已修复"却没验证。这个起步包把一套经过实践的约束直接放进仓库：
 
-**三种入口**（任选其一，效果等价）：
+| 装进项目的内容 | 作用 |
+|---|---|
+| `AGENTS.md` | AI 进项目先读的总规则：按改动规模（S / M / L）走不同流程，**未经人确认不提交** |
+| `BACKEND_RULES.md` / `FRONTEND_RULES.md` | 编码规则示例：模块依赖方向、依赖注入、异常、时间类型、前端跨域 import |
+| `dev.sh` + `docker-compose.dev.yml` | 开发容器、编译、测试、日志，以及 `check --arch` 架构规则扫描 |
+| `.claude/skills/`（20 个） | 头脑风暴、写计划、TDD、系统化调试、代码评审、完成前验证、OpenSpec 需求变更等方法论 |
+| `docs/agents/`、`.learnings/`、`openspec/templates/` | 会话 / 验证 / 归档的操作规程、经验沉淀模板、需求文档模板 |
 
-| 入口 | 适用场景 |
-|------|----------|
-| **npm 私库** `npx @your-org/harness-starter` | 内网已配 `npm.example.com`，无需 MinIO / 无需 clone 起步包仓库 |
-| **MinIO 单文件** `bash <(curl …) install.sh` | 零依赖、单文件分发（见下文） |
-| **git clone + init.sh** | 要审计源码、固定 commit、离线环境 |
+可选再装：前端设计（`frontend-design`、`ui-ux-pro-max`）、库表血缘分析（`table-lineage`）。
 
-装完后：按 `CUSTOMIZE.md` 改少量字段，或在 Cursor 里让 AI 跑 **`harness-install-finisher`** 收尾；再 `bash dev.sh check --arch`，**Harness 工程体系就在你的仓库里跑起来了**。
+## 快速开始
 
-## 给谁用
-
-- **新仓库从 0 搭 AI 流水线**：直接用，省掉自己摸索 3-6 个月的时间
-- **老仓库要补 AI 流水线**：按 Tier 分层逐步引入（先 skill + AGENTS.md，再 dev.sh，最后 OpenSpec）
-- **只想拿走某一块**：可以——三层是物理隔离的（见下方）
-
-## 起步包的两层结构
-
-```
-harness-starter/
-├── README.md              ← 你正在读的文件
-├── INSTALL.md             ← 5 步安装指南
-├── CUSTOMIZE.md           ← 各文件"必改/选改/可不改"清单
-├── init.sh                ← 非交互式初始化脚本（sed 替换占位符）
-├── bootstrap.sh           ← 一行零残留安装入口（git clone 版）
-├── uninstall.sh           ← 卸载脚本（按安装清单 .harness-starter-manifest 只删装进去的文件）
-├── package.json           ← npm 包 `@your-org/harness-starter`（私库 npx 入口）
-├── bin/                   ← `harness-starter` CLI → 调 `init.sh`
-├── docs/                  ← 维护者文档
-│   ├── design.md          ← 这套包为什么这样分层（回答"为什么不用 npm？"等问题）
-│   └── plans/             ← 各版本的设计文档（含 brainstorming 产物）
-├── scripts/               ← 维护者脚本 + 安装时扫描逻辑
-│   ├── build-installer.sh ← 重新打包 install.sh 并上传 MinIO
-│   └── detect-project.sh  ← `init.sh --auto` 用的项目结构探测（也打进 install.sh 包内）
-│
-├── tier1-direct/                   ← 100% 项目无关，cp -r 即用
-│   ├── .claude/skills/             ← 20 个通用工程方法论 skill（含项目编排入口和一次性安装收尾）
-│   │    ├─ using-superpowers / brainstorming / writing-plans / executing-plans
-│   │    ├─ verification-before-completion / systematic-debugging
-│   │    ├─ receiving-code-review / requesting-code-review
-│   │    ├─ openspec-{explore,propose,apply-change,archive-change}
-│   │    ├─ test-driven-development / using-git-worktrees
-│   │    ├─ dispatching-parallel-agents / subagent-driven-development
-│   │    ├─ finishing-a-development-branch / writing-skills
-│   │    ├─ harness-orchestrator      ← 项目编排入口（每个新需求走一遍完整流程）
-│   │    └─ harness-install-finisher  ← 装完 starter 后填 CUSTOMIZE 🔴 项（一次性）
-│   ├── docs/agents/                ← session.md / verify.md / archive.md SOP
-│   ├── .learnings/                 ← 索引模板 + 24 类 Tag 词典 + 子文件骨架
-│   └── openspec/templates/         ← 四件套模板：proposal/design/tasks/TRACE
-│
-├── tier1-direct-optional/          ← 可选，按开关安装
-│   └── .claude/skills/
-│       ├─ frontend-design          ← 前端页面/组件/海报设计 skill（--include-frontend-design）
-│       ├─ ui-ux-pro-max            ← UI/UX 设计智能（50 styles / 21 palettes ...）（同上）
-│       └─ table-lineage            ← 库表血缘页面：表由谁写、从哪取数、谁在读（--include-table-lineage，需 Python 3.11+）
-│
-└── tier2-template/                 ← 含占位符，按项目改
-    ├── AGENTS.md                   ← 入口契约（{{PROJECT_NAME}} 等）
-    ├── BACKEND_RULES.md            ← 6 类常见后端规则示例（Java 风味）
-    ├── FRONTEND_RULES.md           ← 跨域 import 等前端规则示例
-    ├── dev.sh                      ← 开发脚本骨架（compile/check/reload/test/logs）
-    └── docker-compose.dev.yml      ← 开发容器（Gradle / Maven 自动适配）
-```
-
-> mcp-gateway 上游还有 2 个 skill（`ent-mcp-operate-analysis` / `testCaseWriting-infra-DevOps`）**不进起步包**——它们是 mcp-gateway 特有的业务分析 / 测试基建 skill，没有跨项目复用价值。如果你的项目有类似场景，参考 `CUSTOMIZE.md §F` 的方法论自己写一份。
-
-## 三层复用度分级
-
-| 层级 | 复用程度 | 怎么用 |
-|------|---------|-------|
-| **Tier 1 · 直接拿来即用** | 100% 项目无关 | `init.sh` 自动把 `tier1-direct/` 铺到项目根 |
-| **Tier 2 · 模板 + 占位符** | 骨架可复用，需填空 | 跑 `init.sh` 替换占位符，再按 `CUSTOMIZE.md` 改 5~10 字段 |
-| **Tier 3 · 项目自写**（不在本包内）| 0% 文件复用，给方法论 | 见 `CUSTOMIZE.md` 末尾的"自写指南"——例如怎么从事故反推 grep 规则 |
-
-## 30 秒上手（推荐 · `--auto` 零参数自动扫描）
-
-### 方式 A · npm 私库（内网推荐）
+在你的项目根目录运行：
 
 ```bash
-cd /path/to/your-project
-
-# 已把 registry 配进 ~/.npmrc 时可省略 --registry=
-npx --registry=https://npm.example.com/ -y @your-org/harness-starter --auto
-# 同上：扫 7 个字段 → 交互确认 → 安装
-# CI：加 --yes；只看扫描结果：加 --dry-run
-# 前端 UI skill：npx … @your-org/harness-starter --auto --include-frontend-design
-# 库表血缘 skill：npx … @your-org/harness-starter --auto --include-table-lineage
+bash <(curl -fsSL https://raw.githubusercontent.com/caokang1/harness-agent/main/bootstrap.sh) --auto
 ```
 
-包名：`@your-org/harness-starter`；**请用私库 `latest`（当前 ≥1.1.1）**，含 Gradle 多行 `include 'mod'` 模块扫描修复。
+它会自动识别项目名、模块、包名、技术栈、启动类、前端目录、端口和构建工具，列出来让你确认后再安装。安装过程在临时目录里完成，项目里不会留下起步包本身。
 
-### 方式 B · MinIO 单文件 install.sh
+```
+  1)  ✅  project-name       = my-service
+  2)  ✅  modules            = common,auth,core,order,start
+  3)  ✅  backend-package    = com.example.myservice
+  4)  ✅  tech-stack         = springboot+vue
+  5)  ✅  app-main-class     = MyServiceApplication
+  6)  ✅  frontend-dir       = ../my-service-ui
+  7)  ✅  backend-port       = 8080
+  8)  ✅  build-tool         = gradle
 
-```bash
-cd /path/to/your-project
-
-bash <(curl -fsSL https://minio.example.com/your-bucket/harness-starter/install.sh) --auto
-# 会自动扫出 project-name / modules / backend-package / tech-stack /
-# app-main-class / frontend-dir / backend-port 7 个字段，展示给你确认后继续
-#
-# CI / 无人值守场景，加 --yes 跳过确认：
-# bash <(curl ... install.sh) --auto --yes
-#
-# 纯后端项目建议：bash <(curl ... install.sh) --auto
-# 前端 UI 占比高的项目：bash <(curl ... install.sh) --auto --include-frontend-design
+确认：[回车] 接受并继续  [数字 1-8] 修改第 N 项  [q] 退出 >
 ```
 
-> MinIO 上的 `install.sh` 需由维护者执行 `bash scripts/build-installer.sh` 重新打包上传后，才会带上与 Git 主线一致的 `--auto` / `detect-project.sh`。
+装完后二选一：
 
-装完之后：
+- **让 AI 收尾（推荐）**：在 Claude Code / Cursor 里打开项目，发送"请用 harness-install-finisher 完成剩余配置"
+- **手工收尾**：按 `CUSTOMIZE.md` 改 5～10 个字段
+
+然后跑一次架构检查确认基线：
 
 ```bash
-# 按 CUSTOMIZE.md 改 5~10 个字段，也可以让 AI 帮你做：
-#   在 Cursor / Claude Code 里打开此项目，发送：
-#     请用 harness-install-finisher 完成剩余配置
-# AI 会基于你项目的实际代码扫字段、逐项填好、跑一次 arch 基线。
-
-# 一条龙检查：
 bash dev.sh check --arch
 ```
 
-### 显式参数路径（CI 固定配置 / 需要精确控制）
+常用变体：
 
 ```bash
-bash <(curl -fsSL https://minio.example.com/your-bucket/harness-starter/install.sh) \
-  --project-name="my-awesome-service" \
-  --tech-stack="springboot+vue" \
-  --modules="api,core,common" \
-  --backend-package="com.example.mysvc" \
-  --frontend-dir="../my-awesome-service-ui"
+bash <(curl -fsSL .../bootstrap.sh) --auto --dry-run              # 只看识别结果，不安装
+bash <(curl -fsSL .../bootstrap.sh) --auto --yes                  # 不询问，直接采用（CI 用）
+bash <(curl -fsSL .../bootstrap.sh) --auto --include-table-lineage # 加装库表血缘 skill
 ```
 
-> 显式参数 > `--auto` 扫描 > 默认值。可以混用——比如 `--auto --modules=api,core`（仅模块用显式，其他字段走扫描）。
+不想用一行命令，也可以 `git clone` 下来审阅后再装，见 [使用文档 · 安装](docs/USAGE.md#2-安装)。
 
-**行为**：`install.sh` 是**自包含安装包**——文件内嵌了所有模板内容（base64 tar），无需网络访问 GitLab、无需 `git` 命令，下载一个文件即可完成全部安装。解压到 `mktemp -d` 临时目录后调 `init.sh` 把 `tier1/tier2` 铺到你当前目录，**项目根从头到尾不出现 `.harness-starter/`，也不用手动 `rm -rf`**。
+## 环境要求
 
-### 备选：`git clone` 直调（想先审计源码 / 固定 commit）
+| 用途 | 需要 |
+|---|---|
+| 安装 | `bash` 3.2 及以上、`git`、`curl` |
+| `dev.sh`（开发容器、编译、测试） | Docker 与 Docker Compose |
+| 支持的项目 | Spring Boot（Gradle 或 Maven，单 / 多模块），可带 Vue 前端；纯后端也支持 |
+| 可选 skill | `ui-ux-pro-max`：Python 3；`table-lineage`：Python 3.11+ |
+
+Windows 上请在 WSL 或 Git Bash 里运行。
+
+## 卸载
 
 ```bash
-cd /path/to/your-project
-git clone https://github.com/caokang1/harness-agent.git .harness-starter
-# 推荐：零参数扫描（与 MinIO / npx 行为一致）
-bash .harness-starter/init.sh --auto
-# 或显式参数（同前）
-# bash .harness-starter/init.sh --project-name=… --modules=… …
-rm -rf .harness-starter
+bash <(curl -fsSL https://raw.githubusercontent.com/caokang1/harness-agent/main/uninstall.sh) --dry-run   # 先看会删什么
+bash <(curl -fsSL https://raw.githubusercontent.com/caokang1/harness-agent/main/uninstall.sh) --yes
 ```
 
-完整步骤与降级方案（包括无 `git` 命令时走 `curl | tar`）见 [`INSTALL.md`](./INSTALL.md)。
+安装时会记一份清单 `.harness-starter-manifest`，卸载只删清单里的文件；你原有的 `AGENTS.md`、`.claude/settings.json` 等不会被动到。
 
-## 不是什么
+## 仓库结构
 
-- **不是常驻运行时**：`npx @your-org/harness-starter` 只是把模板**一次性**拷进当前仓库；没有长期驻留进程、没有「装在你机器上的服务」。npm 只是**可选分发通道**，核心仍是目录树 + `init.sh`。
-- **不是传统「创建项目」脚手架**：`init.sh` / `bootstrap.sh` / npx 包装都是一次性入口，跑完退出；不会在全局注册持续升级的 CLI。
-- **不是开箱完美**：6 类 grep 规则示例**基于 Java 项目反推**，其他栈需要按 `CUSTOMIZE.md` 改 grep 模式。
-- **不是单元测试套件**：本包不带测试，靠"装上之后跑一次完整 OpenSpec 流程不报错"自验。
+```
+├── bootstrap.sh / init.sh / uninstall.sh   安装、初始化、卸载脚本
+├── bin/cli.js、package.json                 npm 入口（团队自建 npm 源时用）
+├── scripts/                                 项目识别（detect-project.sh）、单文件安装包打包（build-installer.sh）
+├── tier1-direct/                            与项目无关，原样复制
+│   ├── .claude/skills/                      20 个方法论 skill
+│   ├── docs/agents/                         会话 / 验证 / 评审 / 归档 规程
+│   ├── .learnings/                          经验沉淀模板
+│   └── openspec/templates/                  需求变更文档模板
+├── tier1-direct-optional/.claude/skills/    可选 skill：frontend-design、ui-ux-pro-max、table-lineage
+├── tier2-template/                          带占位符、安装时按项目填好
+│   ├── AGENTS.md、BACKEND_RULES.md、FRONTEND_RULES.md、CUSTOMIZE.md
+│   └── dev.sh、docker-compose.dev.yml
+└── docs/                                    使用文档、设计说明
+```
 
-## 与 mcp-gateway 上游的关系
+三层的复用程度：
 
-本起步包的初版**物理抽自** `mcp-gateway` 主项目对应文件，但已独立仓库化——**独立后两边不自动同步**：
+| 层 | 复用程度 | 怎么用 |
+|---|---|---|
+| Tier 1 | 100% 与项目无关 | 安装时原样复制 |
+| Tier 2 | 骨架通用，需要填空 | 安装时替换占位符，再按 `CUSTOMIZE.md` 微调 |
+| Tier 3 | 每个项目自己写 | 不在本包内；`CUSTOMIZE.md` 末尾给了写法指南 |
 
-- mcp-gateway 是 starter 的**最初源头**，但不是"主版本"
-- mcp-gateway 后续改 skill / 规则 / SOP 时，**不自动**传递到 starter
-- starter 的维护者**手动 cherry-pick / 对账**值得带进来的改动（通常是通用性强的方法论更新）
-- 反过来 starter 的改动也不自动回传 mcp-gateway
+## 它不是什么
 
-换句话说：独立后各自演进，定期对账，而不是实时镜像。分层与同步策略见 [`docs/design.md`](./docs/design.md)。
+- **不是常驻服务**：安装是一次性复制文件，装完的文件就是你仓库的一部分，可以随意修改，不需要和本仓库同步。
+- **不是项目脚手架**：不会帮你生成业务代码，只放规则、流程和脚本。
+- **不是开箱即完美**：`dev.sh` 里的检查规则以 Java 项目为例，其他技术栈需要按 `CUSTOMIZE.md` 调整。
 
 ## 反馈
 
-发现 starter 里某条规则在你的项目栈不适用？直接在本仓库提 issue / MR：<https://github.com/caokang1/harness-agent>
-
-我们会在 `CUSTOMIZE.md` 里补一条对应栈的改造指引。
+发现某条规则在你的技术栈上不适用，或者识别结果不对？欢迎在 [GitHub Issues](https://github.com/caokang1/harness-agent/issues) 提出。
