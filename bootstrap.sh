@@ -2,12 +2,12 @@
 # ============================================================
 # Harness Starter Kit · Bootstrap（零残留安装器）
 #
-# 仓库：https://git.example.com/your-group/harness-starter
+# 仓库：https://github.com/caokang1/harness-agent
 #
 # 一行跑完（在你要改造的项目根目录执行）：
 #
 #   bash <(curl -fsSL \
-#     https://git.example.com/your-group/harness-starter/-/raw/main/bootstrap.sh) \
+#     https://raw.githubusercontent.com/caokang1/harness-agent/main/bootstrap.sh) \
 #     --project-name="my-svc" \
 #     --tech-stack="springboot+vue" \
 #     --modules="common,auth,core,market,skills,start" \
@@ -27,7 +27,7 @@
 
 set -euo pipefail
 
-REPO_URL="${HARNESS_STARTER_REPO:-https://git.example.com/your-group/harness-starter.git}"
+REPO_URL="${HARNESS_STARTER_REPO:-https://github.com/caokang1/harness-agent.git}"
 REF="${HARNESS_STARTER_REF:-main}"
 
 # --- 环境自检 ---
@@ -39,7 +39,7 @@ bootstrap.sh 依赖 git 做浅克隆。两种解决方式：
   1) 安装 git（推荐）：apt-get install -y git  /  yum install -y git  /  brew install git
   2) 走无 git 的 tar.gz 降级路径（见 INSTALL.md "常见问题 Q6"）：
        curl -fsSL <tar.gz url> | tar -xz -C /tmp
-       bash /tmp/harness-starter-main/init.sh ...
+       bash /tmp/harness-agent-main/init.sh ...
 EOF
   exit 127
 fi

@@ -32,7 +32,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://git.example.com/your-group/harness-starter.git"
+    "url": "https://github.com/caokang1/harness-agent.git"
   },
   "publishConfig": {
     "registry": "https://npm.example.com/"

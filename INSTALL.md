@@ -118,7 +118,7 @@ git commit -m "chore: 引入 harness-starter (Java+Vue 模板)"
 
 ```bash
 cd /path/to/your-project
-git clone https://git.example.com/your-group/harness-starter.git .harness-starter
+git clone https://github.com/caokang1/harness-agent.git .harness-starter
 # 想固定到某个 commit：  git -C .harness-starter checkout <sha>
 bash .harness-starter/init.sh \
   --project-name="my-awesome-service" \
@@ -142,7 +142,7 @@ rm -rf .harness-starter           # 手动清理起步包目录（含它自己�
 ```bash
 cd /path/to/your-project
 mkdir -p .harness-starter
-curl -fsSL https://git.example.com/your-group/harness-starter/-/archive/main/harness-starter-main.tar.gz \
+curl -fsSL https://github.com/caokang1/harness-agent/archive/refs/heads/main.tar.gz \
   | tar -xz --strip-components=1 -C .harness-starter
 bash .harness-starter/init.sh \
   --project-name="my-awesome-service" \
@@ -208,7 +208,7 @@ A：本期只覆盖 Java + Vue 双栈。如果你是 Node/Python/Go：
 A：`init.sh` 会**跳过已存在的文件**并报警。手动合并：
 ```bash
 # bootstrap 场景已自动清理 TMPDIR，用降级 A 拿到本地副本再 diff：
-git clone --depth=1 https://git.example.com/your-group/harness-starter.git /tmp/hs-ref
+git clone --depth=1 https://github.com/caokang1/harness-agent.git /tmp/hs-ref
 diff -u AGENTS.md /tmp/hs-ref/tier2-template/AGENTS.md
 ```
 按需把 starter 里没有的段（比如规则变更日志）合并到你现有的文件。
@@ -216,7 +216,7 @@ diff -u AGENTS.md /tmp/hs-ref/tier2-template/AGENTS.md
 **Q3：我只想要 skill，不要 `dev.sh` / OpenSpec / `.learnings` 怎么办？**
 A：走降级 A 的"拿到本地副本"方式：
 ```bash
-git clone --depth=1 https://git.example.com/your-group/harness-starter.git /tmp/hs-ref
+git clone --depth=1 https://github.com/caokang1/harness-agent.git /tmp/hs-ref
 cp -r /tmp/hs-ref/tier1-direct/.claude .
 rm -rf /tmp/hs-ref
 ```

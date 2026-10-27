@@ -16,9 +16,9 @@
 
 | 优先级 | 字段 | 默认占位 | 改成什么 |
 |------|------|---------|---------|
-| 🔴 | 项目简介段 | `> {{PROJECT_NAME}} 是一个 ...` | 写清"是什么、给谁用、当前状态" |
-| 🔴 | 模块依赖图 | 占位 ASCII 图 | 改成你项目的实际模块拓扑 |
-| 🔴 | 技术栈段 | `Java 17 + Spring Boot 3.x + Vue 3 + Vite` | 按实际版本改 |
+| 🔴 | 项目简介段 | `> {{PROJECT_DESC}}` 等首段 | 写清"是什么、给谁用、当前状态" |
+| 🔴 | 模块拓扑与依赖 | 见 `BACKEND_RULES.md` 占位 | 改成你项目的实际分层与合法依赖（AGENTS 已瘦身，拓扑只维护在后端规则里）|
+| 🔴 | 技术栈段 | `{{TECH_STACK}}` 首段 | 按实际版本改 |
 | 🟡 | 规则变更日志 | 仅 1 条示例 | 留空，让团队自己往里加 |
 | 🟢 | 项目缩写 | `mg`（MCP Gateway 缩写） | 通常用项目首字母 |
 
@@ -158,7 +158,7 @@ bash .harness-starter/init.sh --include-frontend-design --include-table-lineage 
 **方式 2 · 事后补装**（bootstrap 场景已无 `.harness-starter/`，直接拉 optional 子目录即可）：
 ```bash
 git clone --depth 1 --filter=blob:none --sparse \
-  https://git.example.com/your-group/harness-starter.git /tmp/hs
+  https://github.com/caokang1/harness-agent.git /tmp/hs
 cd /tmp/hs && git sparse-checkout set tier1-direct-optional
 cp -r /tmp/hs/tier1-direct-optional/.claude/skills/* /path/to/your-project/.claude/skills/
 rm -rf /tmp/hs

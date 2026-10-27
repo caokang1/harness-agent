@@ -2,7 +2,7 @@
 
 > 把 MCP Gateway 半年沉淀的 Harness 工程实践抽出**可复用部分**，让任何团队 30 分钟内把 AI-first 的开发流水线装到自己项目上。
 
-**仓库地址**：<https://git.example.com/your-group/harness-starter>
+**仓库地址**：<https://github.com/caokang1/harness-agent>
 
 ---
 
@@ -150,7 +150,7 @@ bash <(curl -fsSL https://minio.example.com/your-bucket/harness-starter/install.
 
 ```bash
 cd /path/to/your-project
-git clone https://git.example.com/your-group/harness-starter.git .harness-starter
+git clone https://github.com/caokang1/harness-agent.git .harness-starter
 # 推荐：零参数扫描（与 MinIO / npx 行为一致）
 bash .harness-starter/init.sh --auto
 # 或显式参数（同前）
@@ -180,6 +180,6 @@ rm -rf .harness-starter
 
 ## 反馈
 
-发现 starter 里某条规则在你的项目栈不适用？直接在本仓库提 issue / MR：<https://git.example.com/your-group/harness-starter>
+发现 starter 里某条规则在你的项目栈不适用？直接在本仓库提 issue / MR：<https://github.com/caokang1/harness-agent>
 
 我们会在 `CUSTOMIZE.md` 里补一条对应栈的改造指引。

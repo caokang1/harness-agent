@@ -2,11 +2,11 @@
 # ============================================================
 # Harness Starter Kit · 非交互式初始化脚本
 #
-# 仓库：https://git.example.com/your-group/harness-starter
+# 仓库：https://github.com/caokang1/harness-agent
 #
 # 推荐路径（零残留，一行搞定，见 bootstrap.sh）：
 #   bash <(curl -fsSL \
-#     https://git.example.com/your-group/harness-starter/-/raw/main/bootstrap.sh) \
+#     https://raw.githubusercontent.com/caokang1/harness-agent/main/bootstrap.sh) \
 #     --project-name="my-svc" \
 #     --tech-stack="springboot+vue" \
 #     --modules="api,core,common,auth,start" \
@@ -17,7 +17,7 @@
 #
 # 直调用法（想先审计 / 固定 commit / 离线安装）：
 #   cd /path/to/your-project
-#   git clone https://git.example.com/your-group/harness-starter.git .harness-starter
+#   git clone https://github.com/caokang1/harness-agent.git .harness-starter
 #   bash .harness-starter/init.sh \
 #     --project-name="my-svc" \
 #     --tech-stack="springboot+vue" \
