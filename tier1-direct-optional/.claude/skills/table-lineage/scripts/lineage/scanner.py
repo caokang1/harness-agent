@@ -134,7 +134,6 @@ def lookup(jfqn, module):
     return keys[0]
 by_simple = collections.defaultdict(list)
 methods = {}            # id -> Meth
-module_of_path = {}
 
 def module_of(path):
     return os.path.relpath(path, ROOT).replace(os.sep, '/').split('/')[0]
@@ -214,9 +213,6 @@ def parse_java(path, text):
                     methods[obj.id] = obj
                     classes[obj.cls].methods[obj.name].append(obj.id)
             seg_start = i + 1
-    # interface (abstract) methods without body: needed for Feign/mapper annotations
-    for fqn in [f for f in classes if classes[f].path == path and classes[f].kind in ('interface',)]:
-        pass
 
 def strip_parens(s):
     prev = None
@@ -248,20 +244,6 @@ def parse_field(k, seg_o, seg_b):
     m = FIELD_RX.search(b.split('=')[0] + ('=' if '=' in b else ''))
     if m and m.group(1) not in JAVA_KW and m.group(1) not in ('return', 'package', 'import'):
         k.fields[m.group(2)] = m.group(1)
-
-ABS_RX = re.compile(r'((?:@[\w.]+(?:\s*\((?:[^()]|\([^()]*\))*\))?\s*)*)(?:public\s+|default\s+|abstract\s+)?[\w.<>\[\], ?]+\s+(\w+)\s*\(([^;{]*?)\)\s*(?:throws\s+[\w.,\s]+)?;', re.S)
-def parse_abstract_methods(k, nc, bl):
-    # only at the interface's own body; approximate by scanning its file region
-    for m in ABS_RX.finditer(nc):
-        name = m.group(2)
-        if name in JAVA_KW: continue
-        mt = Meth(); mt.cls = k.fqn; mt.name = name; mt.line = nc[:m.start(2)].count('\n') + 1
-        mt.params = parse_params(m.group(3)); mt.ann = m.group(1); mt.raw_ann = m.group(1); mt.body = ''
-        mt.locals = {}; mt.calls = []; mt.refs = set(); mt.subrefs = set(); mt.chains = []
-        rm = RET_RX.search(m.group(0)[:m.start(2) - m.start()]); mt.ret = rm.group(1) if rm else None
-        mt.id = f'{k.fqn}#{name}@{mt.line}'
-        if mt.id not in methods:
-            methods[mt.id] = mt; k.methods[name].append(mt.id)
 
 LOCAL_RX = re.compile(r'\b([A-Z][\w.]*)(?:\s*<[^;=(){}]*>)?(?:\[\])?\s+(\w+)\s*(?=[=;:,)])')
 RET_RX = re.compile(r'([A-Z][\w.]*)\s*(?:<[^()]*>)?(?:\[\])?\s*$')
@@ -394,7 +376,6 @@ def sql_joins(sql):
             out.add(tuple(sorted([(t1, c1), (t2, c2)])))
     return out
 
-ANN_SQL = re.compile(r'@(Select|Insert|Update|Delete)\s*\(\s*(?:value\s*=\s*)?(\{.*?\}|"(?:[^"\\]|\\.)*"(?:\s*\+\s*"(?:[^"\\]|\\.)*")*)\s*\)', re.S)
 ANN_HEAD = re.compile(r'@(Select|Insert|Update|Delete)\s*\(')
 def ann_sql_blocks(ann):
     """Yield (kind, raw annotation argument) using balanced parentheses, skipping string literals."""
@@ -725,7 +706,7 @@ def entries():
             res.append({'kind': 'sched', 'id': mid, 'handler': h.group(1) if h else '', 'cond': cond})
         elif ('@RestController' in (k.ann or '') or '@Controller' in (k.ann or '')) and k.kind == 'class':
             p = method_path(m)
-            if p and ('public' in ann or re.search(r'@\w+Mapping', ann) or True):
+            if p:
                 res.append({'kind': 'http', 'id': mid, 'path': p, 'cond': cond})
     return res
 

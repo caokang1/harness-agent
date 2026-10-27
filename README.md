@@ -46,7 +46,7 @@ harness-starter/
 │   └── detect-project.sh  ← `init.sh --auto` 用的项目结构探测（也打进 install.sh 包内）
 │
 ├── tier1-direct/                   ← 100% 项目无关，cp -r 即用
-│   ├── .claude/skills/             ← 19 个通用工程方法论 skill（含一次性安装收尾）
+│   ├── .claude/skills/             ← 20 个通用工程方法论 skill（含项目编排入口和一次性安装收尾）
 │   │    ├─ using-superpowers / brainstorming / writing-plans / executing-plans
 │   │    ├─ verification-before-completion / systematic-debugging
 │   │    ├─ receiving-code-review / requesting-code-review
@@ -54,6 +54,7 @@ harness-starter/
 │   │    ├─ test-driven-development / using-git-worktrees
 │   │    ├─ dispatching-parallel-agents / subagent-driven-development
 │   │    ├─ finishing-a-development-branch / writing-skills
+│   │    ├─ harness-orchestrator      ← 项目编排入口（每个新需求走一遍完整流程）
 │   │    └─ harness-install-finisher  ← 装完 starter 后填 CUSTOMIZE 🔴 项（一次性）
 │   ├── docs/agents/                ← session.md / verify.md / archive.md SOP
 │   ├── .learnings/                 ← 索引模板 + 24 类 Tag 词典 + 子文件骨架
@@ -70,8 +71,7 @@ harness-starter/
     ├── BACKEND_RULES.md            ← 6 类常见后端规则示例（Java 风味）
     ├── FRONTEND_RULES.md           ← 跨域 import 等前端规则示例
     ├── dev.sh                      ← 开发脚本骨架（compile/check/reload/test/logs）
-    ├── docker-compose.dev.yml
-    └── .claude/skills/harness-orchestrator/  ← 项目编排入口（项目特异）
+    └── docker-compose.dev.yml      ← 开发容器（Gradle / Maven 自动适配）
 ```
 
 > mcp-gateway 上游还有 2 个 skill（`ent-mcp-operate-analysis` / `testCaseWriting-infra-DevOps`）**不进起步包**——它们是 mcp-gateway 特有的业务分析 / 测试基建 skill，没有跨项目复用价值。如果你的项目有类似场景，参考 `CUSTOMIZE.md §F` 的方法论自己写一份。

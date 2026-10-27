@@ -71,6 +71,7 @@ bash <(curl -fsSL https://minio.example.com/your-bucket/harness-starter/install.
 | `--project-name` | 项目英文名（用于 docker 服务名、`AGENTS.md` 标题等） | `my-awesome-service` |
 | `--tech-stack` | `springboot+vue`，或纯后端 `springboot`（不装前端规则、compose 不含前端服务） | `springboot+vue` |
 | `--modules` | 后端 Gradle/Maven 子模块，逗号分隔，**按依赖从底到顶排列**：最后一个是入口模块，其余前面最多 3 个是基础模块，剩下的是业务模块（装完可在 `dev.sh` 顶部调整） | `common,auth,core,market,start` |
+| `--build-tool` | `gradle` 或 `maven`；不填按项目根的构建文件自动判断，决定 dev.sh 的编译/测试命令和开发容器镜像 | `maven` |
 | `--backend-package` | 后端 Java 顶级包名 | `com.example.myservice` |
 | `--frontend-dir` | 前端仓库相对于后端的路径 | `../my-awesome-service-ui` |
 | `--include-frontend-design` | 额外装 `frontend-design` / `ui-ux-pro-max` 2 个前端 skill | *（flag，无值）* |
@@ -169,7 +170,7 @@ rm -rf .harness-starter
 
 1. **移动** `tier1-direct/`（18 个通用 skill + SOP + learnings + 模板）到项目根
 2. 按 `--include-frontend-design` / `--include-table-lineage` 可选移入 `tier1-direct-optional/` 里对应的 skill
-3. **移动** `tier2-template/`（`AGENTS.md` / RULES / `dev.sh` / 1 个项目特异 skill）到项目根
+3. **移动** `tier2-template/`（`AGENTS.md` / RULES / `dev.sh` / CUSTOMIZE.md）到项目根
 4. 用 `sed` 替换所有 `{{PLACEHOLDER}}` 为参数值
 5. 给 `dev.sh` 加可执行权限
 6. 写入 `.harness-starter-applied.log`（装了什么、哪些参数）

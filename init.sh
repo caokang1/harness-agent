@@ -33,6 +33,7 @@
 #                               frontend-dir / backend-port，进入交互式确认界面
 #   --yes                       配合 --auto 使用，跳过交互直接采用扫描结果（CI 用）
 #   --dry-run                   配合 --auto 使用，只输出扫描结果后退出，不装任何文件
+#   --build-tool=gradle|maven   构建工具；不传时按项目根的构建文件判断（有 Gradle 文件用 gradle，只有 pom.xml 用 maven）
 #   --include-table-lineage     额外安装 table-lineage 库表血缘 skill（Java + MyBatis + MySQL
 #                               项目梳理"表从哪来、到哪去"；需要 Python 3.11+）
 #   --include-frontend-design   额外安装 frontend-design / ui-ux-pro-max 2 个前端 UI 设计 skill
@@ -47,7 +48,7 @@
 # 行为：
 #   1. 把 tier1-direct/（18 个通用 skill + SOP + learnings + 模板）移到项目根
 #   2. 按 --include-frontend-design / --include-table-lineage 可选移入 tier1-direct-optional/ 里对应的 skill
-#   3. 把 tier2-template/（AGENTS.md / RULES / dev.sh / 1 个项目特异 skill）移到项目根
+#   3. 把 tier2-template/（AGENTS.md / RULES / dev.sh / CUSTOMIZE.md）移到项目根
 #   4. 把本次写入文件里的 {{PLACEHOLDER}} 替换为参数值（用户原有的同名文件不碰）
 #   5. 给 dev.sh 加可执行权限
 #   6. 留下 .harness-starter-applied.log 记录和 .harness-starter-manifest 安装清单（卸载用）
@@ -65,7 +66,8 @@ BACKEND_PACKAGE="com.example.app"
 FRONTEND_DIR="../app-ui"
 BACKEND_PORT="8080"
 FRONTEND_PORT="5173"
-JDK_IMAGE="gradle:8.12-jdk21"
+BUILD_TOOL=""                # gradle / maven；不传时按项目根的构建文件判断
+JDK_IMAGE=""                 # 不传时按构建工具选默认镜像
 PROJECT_DESC="Replace this with one-line project description"
 APP_MAIN_CLASS="ApplicationStarter"
 INCLUDE_FRONTEND_DESIGN=0   # --include-frontend-design 开启后把 D 的 2 个前端/UI skill 一起装上
@@ -89,6 +91,7 @@ for arg in "$@"; do
     --backend-port=*)          BACKEND_PORT="${arg#*=}";       EXPLICIT_BACKEND_PORT=1 ;;
     --frontend-port=*)         FRONTEND_PORT="${arg#*=}" ;;
     --jdk-image=*)             JDK_IMAGE="${arg#*=}" ;;
+    --build-tool=*)            BUILD_TOOL="${arg#*=}";         EXPLICIT_BUILD_TOOL=1 ;;
     --project-desc=*)          PROJECT_DESC="${arg#*=}" ;;
     --app-main-class=*)        APP_MAIN_CLASS="${arg#*=}";     EXPLICIT_APP_MAIN_CLASS=1 ;;
     --include-frontend-design) INCLUDE_FRONTEND_DESIGN=1 ;;
@@ -147,6 +150,7 @@ if [ "$AUTO" -eq 1 ]; then
       printf "$fmt" "6)" "$i3" "frontend-dir" "(未扫到)"
     fi
     printf "$fmt" "7)" "$([ -n "$backend_port" ] && echo "$i1" || echo "$i3")" "backend-port"    "${backend_port:-(未扫到，默认 8080)}"
+    printf "$fmt" "8)" "$([ -n "$build_tool" ] && echo "$i1" || echo "$i3")" "build-tool"      "${build_tool:-(未扫到，默认 gradle)}"
   }
 
   _show_scan_result
@@ -162,7 +166,7 @@ if [ "$AUTO" -eq 1 ]; then
   if [ "$YES" -eq 0 ]; then
     while true; do
       echo ""
-      read -r -p "确认：[回车] 接受并继续  [数字 1-7] 修改第 N 项  [q] 退出 > " choice
+      read -r -p "确认：[回车] 接受并继续  [数字 1-8] 修改第 N 项  [q] 退出 > " choice
       case "$choice" in
         ''|y|Y)  break ;;
         q|Q)     echo "[auto] 用户取消安装"; exit 0 ;;
@@ -173,7 +177,8 @@ if [ "$AUTO" -eq 1 ]; then
         5) read -r -p "  新 app-main-class: " app_main_class ;;
         6) read -r -p "  新 frontend-dir: "   frontend_dir;    frontend_status=0 ;;
         7) read -r -p "  新 backend-port: "   backend_port ;;
-        *) echo "  (未识别的输入，请输入 1-7 / 回车 / q)" ;;
+        8) read -r -p "  新 build-tool (gradle 或 maven): " build_tool ;;
+        *) echo "  (未识别的输入，请输入 1-8 / 回车 / q)" ;;
       esac
       echo ""
       _show_scan_result
@@ -188,6 +193,7 @@ if [ "$AUTO" -eq 1 ]; then
   is_explicit APP_MAIN_CLASS  || { [ -n "$app_main_class" ]  && APP_MAIN_CLASS="$app_main_class"; } || true
   is_explicit FRONTEND_DIR    || { [ -n "$frontend_dir" ]    && FRONTEND_DIR="$frontend_dir"; } || true
   is_explicit BACKEND_PORT    || { [ -n "$backend_port" ]    && BACKEND_PORT="$backend_port"; } || true
+  is_explicit BUILD_TOOL      || { [ -n "$build_tool" ]      && BUILD_TOOL="$build_tool"; } || true
 fi
 
 # --- 校验必填 ---
@@ -273,6 +279,32 @@ BUSINESS_MODULE_1="$(_nth 1 $BUSINESS_MODULES)"
 BUSINESS_MODULE_2="$(_nth 2 $BUSINESS_MODULES)"
 
 echo "  模块分工   : 基础 [${BASE_MODULES:-$NONE}]  业务 [${BUSINESS_MODULES:-$NONE}]  入口 [$ENTRY_MODULE]"
+
+# 构建工具：没指定时，项目根有 Gradle 文件用 gradle，只有 pom.xml 用 maven
+if [ -z "$BUILD_TOOL" ]; then
+  BUILD_TOOL=gradle
+  if [ -f "$TARGET_DIR/pom.xml" ] && ! ls "$TARGET_DIR"/settings.gradle* "$TARGET_DIR"/build.gradle* >/dev/null 2>&1; then
+    BUILD_TOOL=maven
+  fi
+fi
+case "$BUILD_TOOL" in
+  gradle)
+    : "${JDK_IMAGE:=gradle:8.12-jdk21}"
+    BUILD_CACHE_DIR=/root/.gradle
+    BOOT_RUN_CMD="gradle :${ENTRY_MODULE//\//:}:bootRun --no-daemon"   # 嵌套模块目录 a/x 对应 :a:x
+    ;;
+  maven)
+    : "${JDK_IMAGE:=maven:3.9-eclipse-temurin-21}"
+    BUILD_CACHE_DIR=/root/.m2
+    # 先把各模块装进本地仓库，入口模块才能解析到兄弟模块的依赖
+    BOOT_RUN_CMD="mvn -B -q install -DskipTests && mvn -B -pl ${ENTRY_MODULE} spring-boot:run"
+    ;;
+  *)
+    echo "[ERROR] --build-tool 只能是 gradle 或 maven（收到：$BUILD_TOOL）"
+    exit 1
+    ;;
+esac
+echo "  构建工具   : $BUILD_TOOL（镜像 $JDK_IMAGE）"
 echo "               （不对的话装完改 dev.sh 顶部的 BASE_MODULES / BUSINESS_MODULES 和 BACKEND_RULES.md）"
 
 # 派生路径
@@ -301,7 +333,8 @@ KEY_TABLES="<table1>, <table2>, <table3>"
 # 本次真正写入的文件（相对项目根，一行一个）：只对它们替换占位符，
 # 并写进 .harness-starter-manifest，uninstall.sh 只删清单里的文件
 PLACED=""
-_record() { PLACED="${PLACED}${1#${TARGET_DIR}/}"$'\n'; }
+# 前缀加引号：项目路径里有 [ * ? 时也按字面去掉，清单里记的才是相对路径
+_record() { PLACED="${PLACED}${1#"${TARGET_DIR}/"}"$'\n'; }
 
 # --- 1. 移动 Tier 1 必装（直接拿来即用）---
 # 逐文件复制：目标文件已存在则跳过（保留用户修改），不存在则写入
@@ -313,7 +346,7 @@ _merge_dir() {
   mkdir -p "$dst"
   local skipped=0 added=0
   while IFS= read -r -d '' f; do
-    local rel="${f#${src}/}"
+    local rel="${f#"${src}/"}"
     local target="${dst}/${rel}"
     mkdir -p "$(dirname "$target")"
     if [ -f "$target" ]; then
@@ -389,24 +422,17 @@ if [ "$HAS_FRONTEND" -eq 0 ] && printf '%s' "$PLACED" | grep -qx 'docker-compose
     && mv "${_compose}.tmp" "$_compose"
 fi
 
-# 拷贝 harness-orchestrator skill 到 .claude/skills/（tier1 已带同名 skill 时以已装的为准）
-mkdir -p "${TARGET_DIR}/.claude/skills"
-if printf '%s' "$PLACED" | grep -qx '.claude/skills/harness-orchestrator/SKILL.md'; then
-  echo "  ✅ .claude/skills/harness-orchestrator（Tier 1 已安装）"
-elif [ -e "${TARGET_DIR}/.claude/skills/harness-orchestrator" ]; then
-  echo "  ⚠️  .claude/skills/harness-orchestrator 已存在，跳过"
-else
-  _merge_dir "${SCRIPT_DIR}/tier2-template/.claude/skills/harness-orchestrator" "${TARGET_DIR}/.claude/skills"
-  echo "  ✅ .claude/skills/harness-orchestrator"
-fi
+# harness-orchestrator（项目编排入口）随 Tier 1 安装，见上面第 1 步
 
 # --- 3. 占位符替换 ---
 echo ""
 echo "[3/3] 替换占位符..."
 
 # 占位符 → 变量名（一行一个）。值里有 / & | 空格都不需要转义
+# bash 5.2+ 默认开启 patsub_replacement，替换文本里的 & 会被当成"匹配到的原文"，这里关掉（旧版 bash 没有这个选项，忽略报错）
+shopt -u patsub_replacement 2>/dev/null || true
 PLACEHOLDERS="PROJECT_NAME PROJECT_DESC TECH_STACK BACKEND_PORT FRONTEND_PORT BACKEND_ROOT FRONTEND_ROOT
-FRONTEND_DIR BACKEND_PACKAGE JDK_IMAGE APP_MAIN_CLASS BASE_MODULE_1 BASE_MODULE_2 BASE_MODULE_3
+FRONTEND_DIR BACKEND_PACKAGE JDK_IMAGE BUILD_TOOL BUILD_CACHE_DIR BOOT_RUN_CMD APP_MAIN_CLASS BASE_MODULE_1 BASE_MODULE_2 BASE_MODULE_3
 BUSINESS_MODULE_1 BUSINESS_MODULE_2 ENTRY_MODULE BASE_MODULES BUSINESS_MODULES DOMAIN_1 DOMAIN_2
 DOMAIN_3 DOMAIN_4 DOMAINS MODULES_SRC_PATHS KEY_TABLES"
 

@@ -24,9 +24,14 @@ class MetadataError(Exception):
 CR, LF = chr(13), chr(10)
 
 
+def norm_header(h):
+    """Header names are matched case-insensitively: GUI exports (Navicat/DBeaver) write TABLE_SCHEMA etc."""
+    return h.replace(chr(0xFEFF), '').strip().lower() if isinstance(h, str) else h
+
+
 def read_csv(path):
     with open(path, encoding='utf-8-sig', newline='') as f:
-        return [{k: (v or '').replace(CR + LF, LF).replace(CR, LF) for k, v in r.items()} for r in csv.DictReader(f)]
+        return [{norm_header(k): (v or '').replace(CR + LF, LF).replace(CR, LF) for k, v in r.items()} for r in csv.DictReader(f)]
 
 
 def write_csv(path, header, rows):
@@ -128,7 +133,7 @@ def dump_mysql(cnf_path, out_dir, mysql_bin='mysql', label=None):
             if not ln:
                 continue
             vals = ln.split('\t')
-            rows.append({h.lower(): ('' if v == 'NULL' else unescape_batch(v).replace(CR + LF, LF).replace(CR, LF)) for h, v in zip(got, vals)})
+            rows.append({norm_header(h): ('' if v == 'NULL' else unescape_batch(v).replace(CR + LF, LF).replace(CR, LF)) for h, v in zip(got, vals)})
         write_csv(os.path.join(out_dir, name + '.csv'), header, rows)
         print(f'  导出 {name}: {len(rows)} 行')
     host = ''

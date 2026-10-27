@@ -140,11 +140,11 @@ class DesignSystemGenerator:
         priorities = [p.lower() for p in priority_keywords]
         best, best_score = results[0], -1
         for rank, row in enumerate(results):
-            name = str(row.get(name_col, "")).lower()
+            name = str(row.get(name_col, "")).strip().lower()
             haystack = " ".join(str(v) for v in row.values()).lower()
             score = 0
             for p in priorities:
-                if p and (p in name or name in p):
+                if p and name and (p in name or name in p):  # "" is a substring of everything
                     score += 10
                 score += len(_words(p) & _words(haystack))
             score -= rank * 0.1  # keep BM25 order as tie-breaker

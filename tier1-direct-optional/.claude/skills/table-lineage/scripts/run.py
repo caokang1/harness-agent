@@ -142,9 +142,9 @@ def main():
     warnings = checks.check_config(cfg, logical)
     for w in warnings: print('   [警告]', w)
     gi = checks.git_info(cfg['repo'])
-    if args.code_label:
-        parts = args.code_label.split()
-        gi = {'branch': parts[0], 'commit': parts[-1] if len(parts) > 1 else '', 'dirty': False}
+    parts = (args.code_label or '').split()   # blank label = not given
+    if parts:
+        gi ={'branch': parts[0], 'commit': parts[-1] if len(parts) > 1 else '', 'dirty': False}
 
     print('3/7 扫描代码', cfg['repo'], gi['branch'], gi['commit'])
     run_cfg = os.path.join(rd, 'project.json')

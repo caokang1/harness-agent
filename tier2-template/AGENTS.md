@@ -2,7 +2,7 @@
 
 > {{PROJECT_DESC}}。{{TECH_STACK}}。
 >
-> 开发环境：后端 `:{{BACKEND_PORT}}`（Spring Boot + Gradle bootRun）+ 前端 `:{{FRONTEND_PORT}}`（Vue3 + Vite dev server）
+> 开发环境：后端 `:{{BACKEND_PORT}}`（Spring Boot，{{BUILD_TOOL}}）+ 前端 `:{{FRONTEND_PORT}}`（Vue3 + Vite dev server）
 
 ## 编码规则入口（每次改代码前必读）
 

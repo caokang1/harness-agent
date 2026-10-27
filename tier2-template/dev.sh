@@ -20,12 +20,16 @@ set -euo pipefail
 COMPOSE_FILE="docker-compose.dev.yml"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ACTION="${1:-help}"
+# 下面的路径（compose 文件、模块目录、源码目录）都相对项目根：从任何目录运行都先切过去
+cd "$SCRIPT_DIR"
 
 # 项目特异配置（init.sh 替换占位符）
 BACKEND_SERVICE="{{PROJECT_NAME}}-dev"
 FRONTEND_SERVICE="{{PROJECT_NAME}}-ui-dev"
-FRONTEND_DIR="${SCRIPT_DIR}/{{FRONTEND_DIR}}"
+FRONTEND_DIR="{{FRONTEND_DIR}}"       # 相对项目根，或绝对路径
+case "$FRONTEND_DIR" in /*) ;; *) FRONTEND_DIR="${SCRIPT_DIR}/${FRONTEND_DIR}" ;; esac
 APP_MAIN_CLASS="{{APP_MAIN_CLASS}}"   # 例：MyServiceApplication（用于 logs 检测启动成功）
+BUILD_TOOL="{{BUILD_TOOL}}"           # gradle 或 maven
 
 # 模块分工（check --arch 用，空格分隔；按 BACKEND_RULES.md §模块依赖方向 调整）
 BASE_MODULES="{{BASE_MODULES}}"          # 基础模块，自下而上：只能依赖排在它前面的基础模块
@@ -40,6 +44,20 @@ check_deps() {
     echo "[ERROR] 未找到 docker，请先安装 Docker"
     exit 1
   fi
+}
+
+# 在后端容器里构建：$1 = compile | test，其余参数原样传给构建工具
+_build() {
+  local action="$1"; shift
+  local cmd
+  case "$BUILD_TOOL:$action" in
+    maven:compile)  cmd=(mvn -B compile) ;;
+    maven:test)     cmd=(mvn -B test) ;;
+    gradle:compile) cmd=(gradle compileJava --no-daemon) ;;
+    gradle:test)    cmd=(gradle test --no-daemon) ;;
+    *) echo "[ERROR] 不支持的构建工具 $BUILD_TOOL（dev.sh 顶部 BUILD_TOOL 只能是 gradle 或 maven）"; exit 1 ;;
+  esac
+  docker compose -f "${COMPOSE_FILE}" exec -T "${BACKEND_SERVICE}" "${cmd[@]}" "$@"
 }
 
 case "$ACTION" in
@@ -59,8 +77,7 @@ case "$ACTION" in
   reload)
     check_deps
     echo "[reload] 编译后端..."
-    docker compose -f "${COMPOSE_FILE}" exec -T "${BACKEND_SERVICE}" \
-      gradle compileJava --no-daemon -q
+    _build compile -q
     echo "[reload] DevTools 将在 ~5-15s 内自动重启。tail logs 验证："
     echo "  bash dev.sh logs backend"
     ;;
@@ -73,8 +90,7 @@ case "$ACTION" in
 
   compile)
     check_deps
-    docker compose -f "${COMPOSE_FILE}" exec -T "${BACKEND_SERVICE}" \
-      gradle compileJava --no-daemon
+    _build compile
     ;;
 
   check)
@@ -86,8 +102,7 @@ case "$ACTION" in
     # ====================================================
     run_java_check() {
       echo "[Java] 编译检查..."
-      if docker compose -f "${COMPOSE_FILE}" exec -T "${BACKEND_SERVICE}" \
-            gradle compileJava --no-daemon -q 2>&1; then
+      if _build compile -q 2>&1; then
         echo "✅ [Java] 编译通过"
       else
         echo "❌ [Java] 编译失败"
@@ -154,11 +169,11 @@ case "$ACTION" in
         local file="$1" m; shift
         for m in "$@"; do
           case "$file" in
-            *.xml)  # 只看 <dependencies> 里的 artifactId
+            *.xml)  # 只看 <dependencies> 里的 artifactId（嵌套模块 a/x 的 artifactId 一般是 x）
               awk '/<dependencies>/{d=1} d{print FILENAME":"FNR": "$0} /<\/dependencies>/{d=0}' "$file" \
-                | grep -E "<artifactId>${m}</artifactId>" || true ;;
-            *)      # project(':m') / project(":m")，implementation / api / compileOnly 都算
-              grep -nE "project\([\"']:${m}[\"']\)" "$file" | sed "s|^|${file}:|" || true ;;
+                | grep -E "<artifactId>${m##*/}</artifactId>" || true ;;
+            *)      # project(':m') / project(":m")，implementation / api / compileOnly 都算；嵌套模块目录 a/x 对应 :a:x
+              grep -nE "project\([\"']:${m//\//:}[\"']\)" "$file" | sed "s|^|${file}:|" || true ;;
           esac
         done
       }
@@ -303,8 +318,7 @@ case "$ACTION" in
 
   test)
     check_deps
-    docker compose -f "${COMPOSE_FILE}" exec -T "${BACKEND_SERVICE}" \
-      gradle test --no-daemon "${@:2}"
+    _build test "${@:2}"
     ;;
 
   logs)

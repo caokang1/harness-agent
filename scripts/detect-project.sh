@@ -2,7 +2,7 @@
 # ============================================================
 # Harness Starter Kit · 项目结构自动探测
 #
-# 被 init.sh 通过 source 调用。提供 7 个 detect_* 函数，
+# 被 init.sh 通过 source 调用。提供 8 个 detect_* 函数，
 # 每个函数按优先级尝试多条来源，扫到就 echo 出来，扫不到返回空串。
 #
 # 约定：
@@ -77,33 +77,29 @@ detect_modules() {
   for f in "$dir/settings.gradle" "$dir/settings.gradle.kts"; do
     if [ -f "$f" ]; then
       local modules
-      # awk 跨行抓 include(...) 整块；兼容 include 'a','b' 无括号的老写法
+      # 收集文件里【每一条】include 语句（不能读到第一条就停）：
+      #   include("a")  ← Kotlin DSL 常见：每行一条
+      #   include(        ← 括号跨多行
+      #     "a", "b")
+      #   include 'a', 'b'    / include 'a',   ← Groovy 无括号写法，逗号结尾时续行
+      #             'b'
+      # 不匹配 includeBuild(...)。之后取出所有引号里的项目路径。
+      # 嵌套项目 ':a:x' 对应目录 a/x，这里输出目录路径（dev.sh / compose 再按需转回 :a:x）
       modules="$(awk '
-        /^[[:space:]]*include[[:space:]]*\(/ {capturing=1; sub(/^[^(]*\(/, ""); }
+        { sub(/\/\/.*$/, "") }
+        !capturing && /^[[:space:]]*include[[:space:]("\047]/ { capturing = 1; buf = "" }
         capturing {
-          # 删掉行尾注释
-          sub(/\/\/.*$/, "");
-          buf = buf " " $0;
-          if (index(buf, ")")) {
-            sub(/\).*$/, "", buf);
-            print buf;
-            exit;
-          }
-          next;
-        }
-        # Groovy 老写法：每行一个 include 'mod' / include "mod" / 或一行 include 'a','b'
-        # 禁止在首行 match 后 exit —— 否则只会留下第一个模块（用户 soa-common/soa-service/soa-start 只扫到第一个）
-        /^[[:space:]]*include[[:space:]]+["\047]/ {
-          sub(/^[^[\047"]*/, "");
-          sub(/\/\/.*$/, "");
-          print;
-          next;
+          buf = buf " " $0
+          if (buf ~ /include[[:space:]]*\(/) { if (index(buf, ")")) done = 1 }
+          else if ($0 !~ /,[[:space:]]*$/) done = 1
+          if (done) { print buf; capturing = 0; done = 0 }
         }
       ' "$f" 2>/dev/null \
-        | tr -d "'\"" \
-        | tr ',' '\n' \
-        | sed -E 's#^[[:space:]]*:?[[:space:]]*##; s#[[:space:]]*$##; s#^.*/##' \
+        | grep -oE "[\"'][^\"']+[\"']" \
+        | tr -d "\"'" \
+        | sed -E 's#^[[:space:]]*:##; s#[[:space:]]*$##; s#:#/#g' \
         | grep -vE '^$' \
+        | awk '!seen[$0]++' \
         | paste -sd ',' -)"
       if [ -n "$modules" ]; then
         echo "$modules"
@@ -337,13 +333,26 @@ _yaml_server_port() {
 }
 
 # ---------------------------------------------------------
+# detect_build_tool
+#   项目根有 settings.gradle(.kts) / build.gradle(.kts) → gradle；只有 pom.xml → maven
+# ---------------------------------------------------------
+detect_build_tool() {
+  local dir="${1:-$TARGET_DIR}" f
+  for f in settings.gradle settings.gradle.kts build.gradle build.gradle.kts; do
+    [ -f "$dir/$f" ] && { echo gradle; return 0; }
+  done
+  [ -f "$dir/pom.xml" ] && { echo maven; return 0; }
+  return 1
+}
+
+# ---------------------------------------------------------
 # detect_all
 #   一次跑完所有 detect，输出给 init.sh 消费的 key=value 行
 # ---------------------------------------------------------
 detect_all() {
   local dir="${1:-$TARGET_DIR}"
 
-  local project_name modules backend_package tech_stack app_main_class frontend_dir frontend_status backend_port
+  local project_name modules backend_package tech_stack app_main_class frontend_dir frontend_status backend_port build_tool
 
   project_name="$(detect_project_name "$dir")"
   modules="$(detect_modules "$dir")"
@@ -356,10 +365,11 @@ detect_all() {
   frontend_status=$?
 
   backend_port="$(detect_backend_port "$dir" 2>/dev/null || echo "")"
+  build_tool="$(detect_build_tool "$dir" 2>/dev/null || echo "")"
 
   # init.sh 会 eval 这些行：值一律用 %q 转义，目录名带空格或 $(...) 也只会被当成普通字符串
   local key
-  for key in project_name modules backend_package tech_stack app_main_class frontend_dir frontend_status backend_port; do
+  for key in project_name modules backend_package tech_stack app_main_class frontend_dir frontend_status backend_port build_tool; do
     printf '%s=%q\n' "$key" "${!key}"
   done
 }

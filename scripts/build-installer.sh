@@ -85,7 +85,8 @@ cleanup() {
 trap cleanup EXIT INT TERM HUP
 
 echo "[install] Harness Starter Kit ${VERSION} · 解压中..."
-echo "\$PAYLOAD" | base64 -d | tar -xz -C "\$TMPDIR"
+# base64 --decode：GNU 和 macOS（含旧版）都认；-d 在旧版 macOS 上不是解码
+echo "\$PAYLOAD" | base64 --decode | tar -xz -C "\$TMPDIR"
 
 if [ ! -f "\$TMPDIR/init.sh" ]; then
   echo "[install] ❌ 解压内容异常：缺少 init.sh" >&2

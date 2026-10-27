@@ -43,6 +43,19 @@ function findBash() {
     const candidate = path.join(root, 'Git', 'bin', 'bash.exe');
     if (fs.existsSync(candidate)) return candidate;
   }
+  // 装在其他位置（scoop、D 盘、便携版）的 Git：从 PATH 里找。
+  // 跳过 System32 下的 bash.exe（那是 WSL 的入口，看不到 Windows 路径）
+  const system32 = path.join(process.env.SystemRoot || 'C:\\Windows', 'System32').toLowerCase();
+  for (const dir of (process.env.PATH || '').split(path.delimiter).filter(Boolean)) {
+    if (path.resolve(dir).toLowerCase().startsWith(system32)) continue;
+    const candidates = [
+      path.join(dir, 'bash.exe'),
+      path.join(dir, '..', 'bin', 'bash.exe'), // PATH 里通常是 <Git>\cmd，bash 在 <Git>\bin
+    ];
+    for (const candidate of candidates) {
+      if (fs.existsSync(candidate)) return path.resolve(candidate);
+    }
+  }
   return null;
 }
 

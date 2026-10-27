@@ -56,10 +56,18 @@ cleanup() {
 trap cleanup EXIT INT TERM HUP
 
 echo "[bootstrap] 临时克隆 $REPO_URL @ $REF → $TMPDIR"
-if ! git clone --depth=1 --branch "$REF" --quiet "$REPO_URL" "$TMPDIR" 2>/dev/null; then
-  # 有些老 git 不支持 --branch 对 commit SHA，回退重试一次
-  git clone --depth=1 --quiet "$REPO_URL" "$TMPDIR"
+if ! git clone --depth=1 --branch "$REF" --quiet "$REPO_URL" "$TMPDIR" 2>"$TMPDIR.err"; then
+  # --branch 只认分支和标签；REF 是提交号时改为完整克隆再 checkout。
+  # 两种都失败就报错退出——绝不悄悄换成默认分支，否则固定版本就失去意义
+  rm -rf "$TMPDIR" && mkdir -p "$TMPDIR"
+  if ! { git clone --quiet "$REPO_URL" "$TMPDIR" && git -C "$TMPDIR" checkout --quiet "$REF"; } 2>>"$TMPDIR.err"; then
+    echo "[bootstrap] ❌ 无法获取 $REPO_URL 的版本 $REF：" >&2
+    sed 's/^/    /' "$TMPDIR.err" >&2
+    rm -f "$TMPDIR.err"
+    exit 1
+  fi
 fi
+rm -f "$TMPDIR.err"
 
 # --- 透传参数给 init.sh ---
 # 用 -f 而不是 -x：git 里 init.sh 不一定带可执行位，下面本来就用 bash 调用

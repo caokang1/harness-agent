@@ -8,6 +8,7 @@ Checks:
   2. determinism: two runs on the same inputs produce byte-identical page data
   3. no regression: accuracy on every ground-truth set is not lower than the baseline
   4. direct-mysql mode (through a fake mysql client) produces exactly the same metadata and page data as CSV mode
+     and CSV headers are case-insensitive (UPPERCASE GUI exports give the same page data)
   5. (demo only) a code change on a reviewed table marks its card and ground truth as stale
 """
 import argparse, csv, json, os, shutil, subprocess, sys, tempfile
@@ -82,6 +83,17 @@ def main():
                     for n in ('tables', 'columns', 'indexes', 'xxl_jobs'))
     results.append(('直连模式与 CSV 模式元数据一致', same_meta, ''))
     results.append(('直连模式与 CSV 模式页面数据一致', core(a) == core(m), ''))
+
+    # GUI exports (Navicat/DBeaver) of sql/export_metadata.sql write UPPERCASE headers, often with a BOM
+    upper = os.path.join(tmp, 'meta-upper')
+    shutil.copytree(args.meta_csv, upper)
+    for n in os.listdir(upper):
+        if n.endswith('.csv'):
+            p = os.path.join(upper, n)
+            head, sep, rest = open(p, encoding='utf-8-sig', newline='').read().partition('\n')
+            open(p, 'w', encoding='utf-8-sig', newline='').write(head.upper() + sep + rest)
+    u = run(ws, tmp, 's5', '--meta-csv', upper, '--label', 'selftest')
+    results.append(('大写表头的 CSV 与小写表头结果一致', core(a) == core(u), ''))
 
     if demo:
         repo2 = os.path.join(tmp, 'repo-changed')
