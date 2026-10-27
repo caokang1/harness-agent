@@ -55,25 +55,26 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM HUP
 
-echo "[bootstrap] 临时克隆 $REPO_URL @ $REF → $TMPDIR"
-if ! git clone --depth=1 --branch "$REF" --quiet "$REPO_URL" "$TMPDIR" 2>"$TMPDIR.err"; then
+# 克隆到临时目录下的 repo/，错误日志也放在临时目录里，中断时随临时目录一起清理
+REPO_DIR="$TMPDIR/repo"
+ERR_LOG="$TMPDIR/clone.err"
+echo "[bootstrap] 临时克隆 $REPO_URL @ $REF → $REPO_DIR"
+if ! git clone --depth=1 --branch "$REF" --quiet "$REPO_URL" "$REPO_DIR" 2>"$ERR_LOG"; then
   # --branch 只认分支和标签；REF 是提交号时改为完整克隆再 checkout。
   # 两种都失败就报错退出——绝不悄悄换成默认分支，否则固定版本就失去意义
-  rm -rf "$TMPDIR" && mkdir -p "$TMPDIR"
-  if ! { git clone --quiet "$REPO_URL" "$TMPDIR" && git -C "$TMPDIR" checkout --quiet "$REF"; } 2>>"$TMPDIR.err"; then
+  rm -rf "$REPO_DIR"
+  if ! { git clone --quiet "$REPO_URL" "$REPO_DIR" && git -C "$REPO_DIR" checkout --quiet "$REF"; } 2>>"$ERR_LOG"; then
     echo "[bootstrap] ❌ 无法获取 $REPO_URL 的版本 $REF：" >&2
-    sed 's/^/    /' "$TMPDIR.err" >&2
-    rm -f "$TMPDIR.err"
+    sed 's/^/    /' "$ERR_LOG" >&2
     exit 1
   fi
 fi
-rm -f "$TMPDIR.err"
 
 # --- 透传参数给 init.sh ---
 # 用 -f 而不是 -x：git 里 init.sh 不一定带可执行位，下面本来就用 bash 调用
 # 起步包可能在仓库根目录，也可能在仓库的 harness-starter/ 子目录
-STARTER_DIR="$TMPDIR"
-[ -f "$STARTER_DIR/init.sh" ] || STARTER_DIR="$TMPDIR/harness-starter"
+STARTER_DIR="$REPO_DIR"
+[ -f "$STARTER_DIR/init.sh" ] || STARTER_DIR="$REPO_DIR/harness-starter"
 if [ ! -f "$STARTER_DIR/init.sh" ]; then
   echo "[bootstrap] ❌ 克隆内容异常：仓库根目录和 harness-starter/ 下都没有 init.sh" >&2
   exit 1

@@ -83,7 +83,13 @@ if [ -f "$MANIFEST" ]; then
     case "$rel" in ''|'#'*) continue ;; esac
     # 防御：清单里只接受项目内的相对路径
     case "$rel" in /*|*..*) continue ;; esac
-    [ -f "${TARGET_DIR}/${rel}" ] && DELETE_FILES+=("$rel")
+    [ -f "${TARGET_DIR}/${rel}" ] || continue
+    # .env 是 init.sh 建的空模板；用户往里填了变量就保留
+    if [ "$rel" = ".env" ] && grep -qvE '^[[:space:]]*(#|$)' "${TARGET_DIR}/.env"; then
+      MANUAL+=(".env")
+      continue
+    fi
+    DELETE_FILES+=("$rel")
   done < <(sort -u "$MANIFEST")
   DELETE_FILES+=(".harness-starter-manifest")
 else

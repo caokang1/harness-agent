@@ -8,7 +8,7 @@ The workspace holds everything project-specific: config/project.json, knowledge/
 Each run writes runs/<timestamp>/ with the page, data, evaluation and a change report,
 and compares itself with the previous run.
 """
-import argparse, datetime, json, os, shutil, subprocess, sys, time
+import argparse, datetime, json, os, subprocess, sys, time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 # Fixed hash seed: set iteration order (and therefore example call trails) must be identical between runs.

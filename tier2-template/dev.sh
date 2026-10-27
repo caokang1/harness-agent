@@ -26,8 +26,11 @@ cd "$SCRIPT_DIR"
 # 项目特异配置（init.sh 替换占位符）
 BACKEND_SERVICE="{{PROJECT_NAME}}-dev"
 FRONTEND_SERVICE="{{PROJECT_NAME}}-ui-dev"
-FRONTEND_DIR="{{FRONTEND_DIR}}"       # 相对项目根，或绝对路径
-case "$FRONTEND_DIR" in /*) ;; *) FRONTEND_DIR="${SCRIPT_DIR}/${FRONTEND_DIR}" ;; esac
+FRONTEND_DIR="{{FRONTEND_DIR}}"       # 相对项目根，或绝对路径（含 Windows 的 D:/work/ui 写法）
+case "$FRONTEND_DIR" in
+  /*|[A-Za-z]:[/\\]*) ;;
+  *) FRONTEND_DIR="${SCRIPT_DIR}/${FRONTEND_DIR}" ;;
+esac
 APP_MAIN_CLASS="{{APP_MAIN_CLASS}}"   # 例：MyServiceApplication（用于 logs 检测启动成功）
 BUILD_TOOL="{{BUILD_TOOL}}"           # gradle 或 maven
 
@@ -76,6 +79,14 @@ case "$ACTION" in
 
   reload)
     check_deps
+    if [ "$BUILD_TOOL" = maven ]; then
+      # Maven 多模块：入口模块以 jar 加载其他模块，DevTools 只盯入口模块的 target/classes，
+      # 只编译的话别的模块改了也不生效。重启后端容器 = 重新 install 并启动（比 Gradle 慢）
+      echo "[reload] Maven：重新构建并重启后端（会比 Gradle 慢）..."
+      docker compose -f "${COMPOSE_FILE}" restart "${BACKEND_SERVICE}"
+      echo "[reload] 看启动进度：bash dev.sh logs backend"
+      exit 0
+    fi
     echo "[reload] 编译后端..."
     _build compile -q
     echo "[reload] DevTools 将在 ~5-15s 内自动重启。tail logs 验证："

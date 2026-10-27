@@ -177,7 +177,14 @@ if [ "$AUTO" -eq 1 ]; then
         5) read -r -p "  新 app-main-class: " app_main_class ;;
         6) read -r -p "  新 frontend-dir: "   frontend_dir;    frontend_status=0 ;;
         7) read -r -p "  新 backend-port: "   backend_port ;;
-        8) read -r -p "  新 build-tool (gradle 或 maven): " build_tool ;;
+        8)
+          # 输入时就校验，免得确认之后才报错、前面改过的项全部白填
+          while true; do
+            read -r -p "  新 build-tool (gradle 或 maven): " build_tool
+            build_tool="$(printf '%s' "$build_tool" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')"
+            case "$build_tool" in gradle|maven) break ;; *) echo "  只能填 gradle 或 maven" ;; esac
+          done
+          ;;
         *) echo "  (未识别的输入，请输入 1-8 / 回车 / q)" ;;
       esac
       echo ""
@@ -279,14 +286,18 @@ BUSINESS_MODULE_1="$(_nth 1 $BUSINESS_MODULES)"
 BUSINESS_MODULE_2="$(_nth 2 $BUSINESS_MODULES)"
 
 echo "  模块分工   : 基础 [${BASE_MODULES:-$NONE}]  业务 [${BUSINESS_MODULES:-$NONE}]  入口 [$ENTRY_MODULE]"
+echo "               （不对的话装完改 dev.sh 顶部的 BASE_MODULES / BUSINESS_MODULES 和 BACKEND_RULES.md）"
 
-# 构建工具：没指定时，项目根有 Gradle 文件用 gradle，只有 pom.xml 用 maven
+# 构建工具：没指定时用 detect-project.sh 的 detect_build_tool 判断（和 --auto 同一套规则），判断不出默认 gradle
 if [ -z "$BUILD_TOOL" ]; then
-  BUILD_TOOL=gradle
-  if [ -f "$TARGET_DIR/pom.xml" ] && ! ls "$TARGET_DIR"/settings.gradle* "$TARGET_DIR"/build.gradle* >/dev/null 2>&1; then
-    BUILD_TOOL=maven
+  if [ -f "${SCRIPT_DIR}/scripts/detect-project.sh" ]; then
+    # shellcheck disable=SC1091
+    source "${SCRIPT_DIR}/scripts/detect-project.sh"
+    BUILD_TOOL="$(detect_build_tool "$TARGET_DIR" 2>/dev/null || true)"
   fi
+  BUILD_TOOL="${BUILD_TOOL:-gradle}"
 fi
+BUILD_TOOL="$(printf '%s' "$BUILD_TOOL" | tr '[:upper:]' '[:lower:]')"
 case "$BUILD_TOOL" in
   gradle)
     : "${JDK_IMAGE:=gradle:8.12-jdk21}"
@@ -296,16 +307,16 @@ case "$BUILD_TOOL" in
   maven)
     : "${JDK_IMAGE:=maven:3.9-eclipse-temurin-21}"
     BUILD_CACHE_DIR=/root/.m2
-    # 先把各模块装进本地仓库，入口模块才能解析到兄弟模块的依赖
-    BOOT_RUN_CMD="mvn -B -q install -DskipTests && mvn -B -pl ${ENTRY_MODULE} spring-boot:run"
+    # 入口模块要从本地仓库解析兄弟模块，所以先 install 再 spring-boot:run（不加 -q，启动时能看到构建进度）。
+    # 因为兄弟模块是以 jar 加载的，改了它们必须重新 install 并重启：dev.sh reload 在 Maven 下会重启后端容器
+    BOOT_RUN_CMD="mvn -B install -DskipTests && mvn -B -pl ${ENTRY_MODULE} spring-boot:run"
     ;;
   *)
     echo "[ERROR] --build-tool 只能是 gradle 或 maven（收到：$BUILD_TOOL）"
     exit 1
     ;;
 esac
-echo "  构建工具   : $BUILD_TOOL（镜像 $JDK_IMAGE）"
-echo "               （不对的话装完改 dev.sh 顶部的 BASE_MODULES / BUSINESS_MODULES 和 BACKEND_RULES.md）"
+echo "  构建工具   : $BUILD_TOOL（镜像 $JDK_IMAGE；不对的话用 --build-tool 重新安装，或改 dev.sh 顶部的 BUILD_TOOL 和 compose 文件）"
 
 # 派生路径
 BACKEND_ROOT="$TARGET_DIR"
@@ -414,6 +425,14 @@ for f in AGENTS.md BACKEND_RULES.md FRONTEND_RULES.md dev.sh docker-compose.dev.
     echo "  ✅ ${f}"
   fi
 done
+
+# compose 的 env_file 要求 .env 存在：没有就建一个只有注释的（不用 required: false，那要 Compose 2.24+）
+# 只在写入了 compose 时才建；uninstall.sh 只在它仍然只有注释时才删
+if printf '%s' "$PLACED" | grep -qx 'docker-compose.dev.yml' && [ ! -e "${TARGET_DIR}/.env" ]; then
+  printf '# 开发容器的环境变量（docker-compose.dev.yml 会读取），例如：\n# SPRING_DATASOURCE_URL=jdbc:mysql://host.docker.internal:3306/app\n' >"${TARGET_DIR}/.env"
+  _record "${TARGET_DIR}/.env"
+  echo "  ✅ .env（空模板）"
+fi
 
 # 纯后端：去掉 compose 里 "# >>> frontend" 到 "# <<< frontend" 之间的前端服务和卷
 if [ "$HAS_FRONTEND" -eq 0 ] && printf '%s' "$PLACED" | grep -qx 'docker-compose.dev.yml'; then

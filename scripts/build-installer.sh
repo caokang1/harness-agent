@@ -85,8 +85,13 @@ cleanup() {
 trap cleanup EXIT INT TERM HUP
 
 echo "[install] Harness Starter Kit ${VERSION} · 解压中..."
-# base64 --decode：GNU 和 macOS（含旧版）都认；-d 在旧版 macOS 上不是解码
-echo "\$PAYLOAD" | base64 --decode | tar -xz -C "\$TMPDIR"
+# 解码参数各家不同：GNU / BusyBox(Alpine) 用 -d，旧版 macOS 用 -D（那里的 -d 不是解码）。
+# 用一段已知内容试一下，选能正确解码的那个
+B64_DECODE="base64 -d"
+if [ "\$(printf 'aGk=' | base64 -d 2>/dev/null)" != "hi" ]; then
+  B64_DECODE="base64 -D"
+fi
+echo "\$PAYLOAD" | \$B64_DECODE | tar -xz -C "\$TMPDIR"
 
 if [ ! -f "\$TMPDIR/init.sh" ]; then
   echo "[install] ❌ 解压内容异常：缺少 init.sh" >&2

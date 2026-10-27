@@ -758,8 +758,6 @@ def main():
                 pubs.append(t)
             elif op == 'SUB':
                 subs += subscriptions.get(sch, {}).get(t) or shared_subscription(t)
-                if sch in subscriptions and t not in subscriptions[sch]:
-                    pass
             elif op == 'FEIGN':
                 fm = methods[t]; feigns.append({'target': short(t), 'module': classes[fm.cls].module, 'path': method_path(fm)})
         e.update({'module': k.module, 'file': os.path.relpath(k.path, ROOT).replace(os.sep, '/'), 'line': m.line,
