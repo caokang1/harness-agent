@@ -35,7 +35,7 @@ harness-starter/
 ├── CUSTOMIZE.md           ← 各文件"必改/选改/可不改"清单
 ├── init.sh                ← 非交互式初始化脚本（sed 替换占位符）
 ├── bootstrap.sh           ← 一行零残留安装入口（git clone 版）
-├── uninstall.sh           ← 卸载脚本
+├── uninstall.sh           ← 卸载脚本（按安装清单 .harness-starter-manifest 只删装进去的文件）
 ├── package.json           ← npm 包 `@your-org/harness-starter`（私库 npx 入口）
 ├── bin/                   ← `harness-starter` CLI → 调 `init.sh`
 ├── docs/                  ← 维护者文档

@@ -29,8 +29,8 @@ PAYLOAD=$(
     tier2-template/ \
     init.sh \
     scripts/detect-project.sh \
-  | base64 -w 0
-)
+  | base64 | tr -d '\n'
+)  # 不用 GNU 专有的 base64 -w 0，macOS 上也能打包
 
 echo "[build] payload 大小：$(echo "$PAYLOAD" | wc -c | awk '{printf "%.1fKB", $1/1024}') (base64)"
 

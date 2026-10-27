@@ -40,9 +40,9 @@ detect_project_name() {
   for f in "$dir/settings.gradle" "$dir/settings.gradle.kts"; do
     if [ -f "$f" ]; then
       local name
-      name="$(grep -E "^\s*rootProject\.name\s*=" "$f" 2>/dev/null \
+      name="$(grep -E "^[[:space:]]*rootProject\.name[[:space:]]*=" "$f" 2>/dev/null \
         | head -1 \
-        | sed -E "s/.*=\s*['\"]?([^'\"]+)['\"]?.*/\1/" \
+        | sed -E "s/.*=[[:space:]]*['\"]?([^'\"]+)['\"]?.*/\1/" \
         | tr -d ' ')"
       if [ -n "$name" ]; then
         echo "$name"
@@ -54,7 +54,8 @@ detect_project_name() {
   # 3) package.json name
   if [ -f "$dir/package.json" ] && command -v node >/dev/null 2>&1; then
     local name
-    name="$(node -e "try{process.stdout.write(require('$dir/package.json').name||'')}catch(e){}" 2>/dev/null || true)"
+    # 路径通过参数传给 node，不拼进代码里
+    name="$(node -e "try{process.stdout.write(require(process.argv[1]).name||'')}catch(e){}" "$dir/package.json" 2>/dev/null || true)"
     if [ -n "$name" ]; then
       echo "$name"
       return 0
@@ -78,7 +79,7 @@ detect_modules() {
       local modules
       # awk 跨行抓 include(...) 整块；兼容 include 'a','b' 无括号的老写法
       modules="$(awk '
-        /^\s*include[[:space:]]*\(/ {capturing=1; sub(/^[^(]*\(/, ""); }
+        /^[[:space:]]*include[[:space:]]*\(/ {capturing=1; sub(/^[^(]*\(/, ""); }
         capturing {
           # 删掉行尾注释
           sub(/\/\/.*$/, "");
@@ -92,7 +93,7 @@ detect_modules() {
         }
         # Groovy 老写法：每行一个 include 'mod' / include "mod" / 或一行 include 'a','b'
         # 禁止在首行 match 后 exit —— 否则只会留下第一个模块（用户 soa-common/soa-service/soa-start 只扫到第一个）
-        /^\s*include[[:space:]]+["\x27]/ {
+        /^[[:space:]]*include[[:space:]]+["\047]/ {
           sub(/^[^[\047"]*/, "");
           sub(/\/\/.*$/, "");
           print;
@@ -101,7 +102,7 @@ detect_modules() {
       ' "$f" 2>/dev/null \
         | tr -d "'\"" \
         | tr ',' '\n' \
-        | sed -E 's#^\s*:?\s*##; s#\s*$##; s#^.*/##' \
+        | sed -E 's#^[[:space:]]*:?[[:space:]]*##; s#[[:space:]]*$##; s#^.*/##' \
         | grep -vE '^$' \
         | paste -sd ',' -)"
       if [ -n "$modules" ]; then
@@ -146,10 +147,11 @@ detect_backend_package() {
 
   # 收集所有 package 声明
   local pkgs
+  # 逐个文件读（不用 GNU 专有的 xargs -r，路径带空格也没问题）
   pkgs="$(find "$dir" -path '*/src/main/java/*.java' -type f 2>/dev/null \
-    | head -$_HS_MAX_FILES \
-    | xargs -r grep -hE "^package\s+" 2>/dev/null \
-    | sed -E 's/^package\s+([a-zA-Z0-9_.]+)\s*;.*/\1/' \
+    | head -n "$_HS_MAX_FILES" \
+    | while IFS= read -r f; do grep -hE "^package[[:space:]]+" "$f" 2>/dev/null; done \
+    | sed -E 's/^package[[:space:]]+([a-zA-Z0-9_.]+)[[:space:]]*;.*/\1/' \
     | sort -u)"
 
   [ -z "$pkgs" ] && return 1
@@ -200,13 +202,16 @@ detect_tech_stack() {
     has_java=1
   fi
 
-  # 扫自己的 package.json 或相邻 *-ui / ../frontend / ./frontend 目录
-  local pkgs=()
+  # 扫自己的 package.json，以及和 detect_frontend_dir 相同的候选目录：
+  # ../<项目名>-ui、../<项目名>-frontend、./frontend、./ui
+  # （不能扫所有相邻的 *-ui：同一个父目录下别的项目的前端会被误认成本项目的）
+  local name pkgs=()
+  name="$(detect_project_name "$dir")"
   [ -f "$dir/package.json" ] && pkgs+=("$dir/package.json")
-  for candidate in "$dir/../"*-ui "$dir/../frontend" "$dir/frontend" "$dir/ui"; do
+  for candidate in "$dir/../$name-ui" "$dir/../$name-frontend" "$dir/frontend" "$dir/ui"; do
     [ -f "$candidate/package.json" ] && pkgs+=("$candidate/package.json")
   done
-  for pj in "${pkgs[@]}"; do
+  for pj in ${pkgs[@]+"${pkgs[@]}"}; do
     if grep -q '"vue"' "$pj" 2>/dev/null; then
       has_vue=1
       break
@@ -295,22 +300,40 @@ detect_backend_port() {
              'application.yml' 'application.yaml' \
              'application-dev.properties' 'application.properties'; do
     local files
-    files="$(find "$dir" -name "$pat" -type f -not -path '*/node_modules/*' -not -path '*/build/*' -not -path '*/target/*' 2>/dev/null)"
-    [ -z "$files" ] && continue
-    for f in $files; do
-      local port
+    local f port
+    while IFS= read -r f; do
+      [ -n "$f" ] || continue
       if [[ "$f" == *.yml || "$f" == *.yaml ]]; then
-        port="$(grep -E '^\s*port:\s*[0-9]+' "$f" 2>/dev/null | head -1 | sed -E 's/.*port:\s*([0-9]+).*/\1/')"
+        port="$(_yaml_server_port "$f")"
       else
-        port="$(grep -E '^server\.port\s*=' "$f" 2>/dev/null | head -1 | sed -E 's/.*=\s*([0-9]+).*/\1/')"
+        port="$(grep -E '^[[:space:]]*server\.port[[:space:]]*[=:]' "$f" 2>/dev/null | head -1 \
+          | sed -E 's/.*[=:][[:space:]]*([0-9]+).*/\1/')"
       fi
-      if [ -n "$port" ]; then
+      if [[ "$port" =~ ^[0-9]+$ ]]; then
         echo "$port"
         return 0
       fi
-    done
+    done < <(find "$dir" -name "$pat" -type f -not -path '*/node_modules/*' -not -path '*/build/*' -not -path '*/target/*' 2>/dev/null)
   done
   return 1
+}
+
+# 只取 server.port：支持 "server.port: 9090" 和 "server:" 下面缩进的 "port: 9090"
+# （不能取文件里第一个 port:，那可能是 redis / datasource 的端口）
+_yaml_server_port() {
+  awk '
+    { sub(/\r$/, "") }
+    /^[[:space:]]*#/ { next }
+    /^server\.port:[[:space:]]*[0-9]+/ { sub(/^server\.port:[[:space:]]*/, ""); sub(/[^0-9].*$/, ""); print; exit }
+    /^[^[:space:]]/ { in_server = ($0 ~ /^server:[[:space:]]*$/); indent = -1; next }
+    in_server && /^[[:space:]]+[A-Za-z_-]+:/ {
+      match($0, /^[[:space:]]+/); cur = RLENGTH
+      if (indent < 0) indent = cur
+      if (cur == indent && $0 ~ /^[[:space:]]+port:[[:space:]]*[0-9]+/) {
+        sub(/^[[:space:]]+port:[[:space:]]*/, ""); sub(/[^0-9].*$/, ""); print; exit
+      }
+    }
+  ' "$1" 2>/dev/null
 }
 
 # ---------------------------------------------------------
@@ -334,16 +357,11 @@ detect_all() {
 
   backend_port="$(detect_backend_port "$dir" 2>/dev/null || echo "")"
 
-  cat <<EOF
-project_name=${project_name}
-modules=${modules}
-backend_package=${backend_package}
-tech_stack=${tech_stack}
-app_main_class=${app_main_class}
-frontend_dir=${frontend_dir}
-frontend_status=${frontend_status}
-backend_port=${backend_port}
-EOF
+  # init.sh 会 eval 这些行：值一律用 %q 转义，目录名带空格或 $(...) 也只会被当成普通字符串
+  local key
+  for key in project_name modules backend_package tech_stack app_main_class frontend_dir frontend_status backend_port; do
+    printf '%s=%q\n' "$key" "${!key}"
+  done
 }
 
 # ---------------------------------------------------------

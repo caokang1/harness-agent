@@ -74,7 +74,7 @@
 | 🔴 | services 的服务名 | `mcp-gateway-dev`、`mcp-gateway-ui-dev` | 改成 `<your-project>-dev` |
 | 🔴 | 后端镜像 | `eclipse-temurin:17-jre` | 按你 JDK 版本 |
 | 🔴 | 后端启动命令 | 引用 `mcp-gateway-start` 模块 | 改成你的 main 模块 + 启动类 |
-| 🟡 | 端口映射 | `8080:8080`、`5173:5173` | 按需改 |
+| 🟡 | 端口映射 | 后端 `<后端端口>:<后端端口>`（并设 `SERVER_PORT`）、前端 `5173:5173` | 按需改 |
 | 🟡 | 数据库依赖 | 默认无（连外部 DB）| 如需本地 DB，加 `services.mysql/postgres` |
 | 🟢 | 网络 | `bridge` 默认 | 通常不动 |
 

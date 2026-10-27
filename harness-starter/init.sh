@@ -46,9 +46,11 @@
 #   1. 把 tier1-direct/（18 个通用 skill + SOP + learnings + 模板）移到项目根
 #   2. 按 --include-frontend-design 可选移入 tier1-direct-optional/（2 个前端 skill）
 #   3. 把 tier2-template/（AGENTS.md / RULES / dev.sh / 1 个项目特异 skill）移到项目根
-#   4. 用 sed 替换所有 {{PLACEHOLDER}} 为参数值
+#   4. 把本次写入文件里的 {{PLACEHOLDER}} 替换为参数值（用户原有的同名文件不碰）
 #   5. 给 dev.sh 加可执行权限
-#   6. 留下 .harness-starter-applied.log 记录
+#   6. 留下 .harness-starter-applied.log 记录和 .harness-starter-manifest 安装清单（卸载用）
+#
+# 兼容：bash 3.2+（含 macOS 自带 bash）、GNU / BSD 工具
 # ============================================================
 
 set -euo pipefail
@@ -69,28 +71,29 @@ AUTO=0                      # --auto：开启项目现场自动扫描
 YES=0                       # --yes ：跳过交互直接采用扫描结果
 DRY_RUN=0                   # --dry-run：只打印扫描结果后退出
 
-# --- 记录用户显式传过的参数 key（用于后续 "显式 > 扫描 > 默认" 的优先级判定）---
-declare -A EXPLICIT=()
+# --- 记录用户显式传过的参数（用于后续 "显式 > 扫描 > 默认" 的优先级判定）---
+# 用普通变量 EXPLICIT_<名字>=1，不用 declare -A：macOS 自带的 bash 3.2 不支持关联数组
+is_explicit() { eval "[ -n \"\${EXPLICIT_$1:-}\" ]"; }
 
 # --- 解析参数 ---
 for arg in "$@"; do
   case "$arg" in
-    --project-name=*)          PROJECT_NAME="${arg#*=}";       EXPLICIT[PROJECT_NAME]=1 ;;
-    --tech-stack=*)            TECH_STACK="${arg#*=}";         EXPLICIT[TECH_STACK]=1 ;;
-    --modules=*)               MODULES="${arg#*=}";            EXPLICIT[MODULES]=1 ;;
-    --backend-package=*)       BACKEND_PACKAGE="${arg#*=}";    EXPLICIT[BACKEND_PACKAGE]=1 ;;
-    --frontend-dir=*)          FRONTEND_DIR="${arg#*=}";       EXPLICIT[FRONTEND_DIR]=1 ;;
-    --backend-port=*)          BACKEND_PORT="${arg#*=}";       EXPLICIT[BACKEND_PORT]=1 ;;
-    --frontend-port=*)         FRONTEND_PORT="${arg#*=}";      EXPLICIT[FRONTEND_PORT]=1 ;;
-    --jdk-image=*)             JDK_IMAGE="${arg#*=}";          EXPLICIT[JDK_IMAGE]=1 ;;
-    --project-desc=*)          PROJECT_DESC="${arg#*=}";       EXPLICIT[PROJECT_DESC]=1 ;;
-    --app-main-class=*)        APP_MAIN_CLASS="${arg#*=}";     EXPLICIT[APP_MAIN_CLASS]=1 ;;
+    --project-name=*)          PROJECT_NAME="${arg#*=}";       EXPLICIT_PROJECT_NAME=1 ;;
+    --tech-stack=*)            TECH_STACK="${arg#*=}";         EXPLICIT_TECH_STACK=1 ;;
+    --modules=*)               MODULES="${arg#*=}";            EXPLICIT_MODULES=1 ;;
+    --backend-package=*)       BACKEND_PACKAGE="${arg#*=}";    EXPLICIT_BACKEND_PACKAGE=1 ;;
+    --frontend-dir=*)          FRONTEND_DIR="${arg#*=}";       EXPLICIT_FRONTEND_DIR=1 ;;
+    --backend-port=*)          BACKEND_PORT="${arg#*=}";       EXPLICIT_BACKEND_PORT=1 ;;
+    --frontend-port=*)         FRONTEND_PORT="${arg#*=}" ;;
+    --jdk-image=*)             JDK_IMAGE="${arg#*=}" ;;
+    --project-desc=*)          PROJECT_DESC="${arg#*=}" ;;
+    --app-main-class=*)        APP_MAIN_CLASS="${arg#*=}";     EXPLICIT_APP_MAIN_CLASS=1 ;;
     --include-frontend-design) INCLUDE_FRONTEND_DESIGN=1 ;;
     --auto)                    AUTO=1 ;;
     --yes)                     YES=1 ;;
     --dry-run)                 DRY_RUN=1 ;;
     --help|-h)
-      sed -n '2,52p' "$0"
+      sed -n '2,/^# =====*$/p' "$0" | sed '1d'   # 打印开头的说明注释
       exit 0
       ;;
     *)
@@ -162,7 +165,7 @@ if [ "$AUTO" -eq 1 ]; then
         1) read -r -p "  新 project-name: "    project_name ;;
         2) read -r -p "  新 modules (逗号分隔): " modules ;;
         3) read -r -p "  新 backend-package: " backend_package ;;
-        4) read -r -p "  新 tech-stack (目前仅支持 springboot+vue): " tech_stack ;;
+        4) read -r -p "  新 tech-stack (springboot+vue 或 springboot): " tech_stack ;;
         5) read -r -p "  新 app-main-class: " app_main_class ;;
         6) read -r -p "  新 frontend-dir: "   frontend_dir;    frontend_status=0 ;;
         7) read -r -p "  新 backend-port: "   backend_port ;;
@@ -174,13 +177,13 @@ if [ "$AUTO" -eq 1 ]; then
   fi
 
   # 把扫描结果合并到已声明变量（显式参数优先级最高）
-  [ -z "${EXPLICIT[PROJECT_NAME]:-}" ]    && [ -n "$project_name" ]    && PROJECT_NAME="$project_name"
-  [ -z "${EXPLICIT[MODULES]:-}" ]         && [ -n "$modules" ]         && MODULES="$modules"
-  [ -z "${EXPLICIT[BACKEND_PACKAGE]:-}" ] && [ -n "$backend_package" ] && BACKEND_PACKAGE="$backend_package"
-  [ -z "${EXPLICIT[TECH_STACK]:-}" ]      && [ -n "$tech_stack" ]      && TECH_STACK="$tech_stack"
-  [ -z "${EXPLICIT[APP_MAIN_CLASS]:-}" ]  && [ -n "$app_main_class" ]  && APP_MAIN_CLASS="$app_main_class"
-  [ -z "${EXPLICIT[FRONTEND_DIR]:-}" ]    && [ -n "$frontend_dir" ]    && FRONTEND_DIR="$frontend_dir"
-  [ -z "${EXPLICIT[BACKEND_PORT]:-}" ]    && [ -n "$backend_port" ]    && BACKEND_PORT="$backend_port"
+  is_explicit PROJECT_NAME    || { [ -n "$project_name" ]    && PROJECT_NAME="$project_name"; } || true
+  is_explicit MODULES         || { [ -n "$modules" ]         && MODULES="$modules"; } || true
+  is_explicit BACKEND_PACKAGE || { [ -n "$backend_package" ] && BACKEND_PACKAGE="$backend_package"; } || true
+  is_explicit TECH_STACK      || { [ -n "$tech_stack" ]      && TECH_STACK="$tech_stack"; } || true
+  is_explicit APP_MAIN_CLASS  || { [ -n "$app_main_class" ]  && APP_MAIN_CLASS="$app_main_class"; } || true
+  is_explicit FRONTEND_DIR    || { [ -n "$frontend_dir" ]    && FRONTEND_DIR="$frontend_dir"; } || true
+  is_explicit BACKEND_PORT    || { [ -n "$backend_port" ]    && BACKEND_PORT="$backend_port"; } || true
 fi
 
 # --- 校验必填 ---
@@ -191,11 +194,15 @@ if [ -z "$PROJECT_NAME" ] || [ -z "$MODULES" ]; then
   exit 1
 fi
 
-if [ "$TECH_STACK" != "springboot+vue" ]; then
-  echo "[ERROR] 当前阶段只支持 --tech-stack=springboot+vue"
-  echo "其他栈请按 CUSTOMIZE.md 末尾的「自写指南」手动改造"
-  exit 1
-fi
+case "$TECH_STACK" in
+  springboot+vue) HAS_FRONTEND=1 ;;
+  springboot)     HAS_FRONTEND=0 ;;   # 纯后端：不装 FRONTEND_RULES.md，compose 去掉前端服务
+  *)
+    echo "[ERROR] 当前只支持 --tech-stack=springboot+vue 或 springboot（纯后端）"
+    echo "其他栈请按 CUSTOMIZE.md 末尾的「自写指南」手动改造"
+    exit 1
+    ;;
+esac
 
 # --- 路径已在 --auto 段提前计算好 ---
 # SCRIPT_DIR / TARGET_DIR 已赋值（见上方）
@@ -217,30 +224,52 @@ echo "  目标根目录 : $TARGET_DIR"
 echo "========================================"
 
 # --- 解析模块列表 ---
-IFS=',' read -ra MODULE_ARR <<< "$MODULES"
+MODULE_ARR=()
+IFS=',' read -ra _raw_modules <<< "$MODULES"
+for m in ${_raw_modules[@]+"${_raw_modules[@]}"}; do   # 空数组时 bash 3.2 + set -u 不报错
+  m="$(printf '%s' "$m" | tr -d '[:space:]')"
+  [ -n "$m" ] && MODULE_ARR+=("$m")
+done
 MODULE_COUNT=${#MODULE_ARR[@]}
-
-if [ "$MODULE_COUNT" -lt 5 ]; then
-  echo "[WARN] 模块数 $MODULE_COUNT < 5，无法完整填充模板。建议至少 5 个模块（3 基础 + 1 业务 + 1 入口）。"
-  echo "       将用占位字符串补齐。"
-  while [ ${#MODULE_ARR[@]} -lt 5 ]; do
-    MODULE_ARR+=("placeholder-$(( ${#MODULE_ARR[@]} + 1 ))")
-  done
+if [ "$MODULE_COUNT" -eq 0 ]; then
+  echo "[ERROR] --modules 里没有有效的模块名"
+  exit 1
 fi
 
-# 简化分配：前 3 个为基础模块，第 4 个为业务模块 1，第 5 个为业务模块 2 / 入口模块
-# （如果模块数 ≥ 6，最后一个作为入口模块）
-BASE_MODULE_1="${MODULE_ARR[0]}"
-BASE_MODULE_2="${MODULE_ARR[1]}"
-BASE_MODULE_3="${MODULE_ARR[2]}"
-BUSINESS_MODULE_1="${MODULE_ARR[3]}"
-if [ "$MODULE_COUNT" -ge 6 ]; then
-  BUSINESS_MODULE_2="${MODULE_ARR[4]}"
-  ENTRY_MODULE="${MODULE_ARR[$((MODULE_COUNT - 1))]}"
+# 模块分工（按 --modules 的顺序）：
+#   最后一个 = 入口模块；其余模块里，最后一个起算的业务模块至少留 1 个，前面最多 3 个是基础模块
+#   例：common,auth,core,market,skills,start → 基础 common/auth/core，业务 market/skills，入口 start
+#       api,core,start                       → 基础 api，业务 core，入口 start
+# 模块不够时缺的角色留空（文档里显示"（无）"、dev.sh 跳过对应检查），不再补假的 placeholder 模块
+ENTRY_MODULE="${MODULE_ARR[$((MODULE_COUNT - 1))]}"
+REST_COUNT=$((MODULE_COUNT - 1))
+if [ "$REST_COUNT" -ge 2 ]; then
+  BASE_COUNT=$((REST_COUNT - 1))
+  [ "$BASE_COUNT" -gt 3 ] && BASE_COUNT=3
 else
-  BUSINESS_MODULE_2="${MODULE_ARR[4]:-business2-placeholder}"
-  ENTRY_MODULE="${MODULE_ARR[$((MODULE_COUNT - 1))]}"
+  BASE_COUNT=$REST_COUNT
 fi
+BASE_MODULES=""
+BUSINESS_MODULES=""
+for ((i = 0; i < REST_COUNT; i++)); do
+  if [ "$i" -lt "$BASE_COUNT" ]; then
+    BASE_MODULES="${BASE_MODULES:+$BASE_MODULES }${MODULE_ARR[$i]}"
+  else
+    BUSINESS_MODULES="${BUSINESS_MODULES:+$BUSINESS_MODULES }${MODULE_ARR[$i]}"
+  fi
+done
+
+NONE="（无）"
+_nth() { local n=$1; shift; local arr=("$@"); echo "${arr[$((n - 1))]:-$NONE}"; }
+# shellcheck disable=SC2086
+BASE_MODULE_1="$(_nth 1 $BASE_MODULES)"
+BASE_MODULE_2="$(_nth 2 $BASE_MODULES)"
+BASE_MODULE_3="$(_nth 3 $BASE_MODULES)"
+BUSINESS_MODULE_1="$(_nth 1 $BUSINESS_MODULES)"
+BUSINESS_MODULE_2="$(_nth 2 $BUSINESS_MODULES)"
+
+echo "  模块分工   : 基础 [${BASE_MODULES:-$NONE}]  业务 [${BUSINESS_MODULES:-$NONE}]  入口 [$ENTRY_MODULE]"
+echo "               （不对的话装完改 dev.sh 顶部的 BASE_MODULES / BUSINESS_MODULES 和 BACKEND_RULES.md）"
 
 # 派生路径
 BACKEND_ROOT="$TARGET_DIR"
@@ -260,9 +289,15 @@ DOMAIN_1="domain1"
 DOMAIN_2="domain2"
 DOMAIN_3="domain3"
 DOMAIN_4="common"
+DOMAINS="$DOMAIN_1 $DOMAIN_2 $DOMAIN_3 $DOMAIN_4"
 
 # 关键业务表占位
 KEY_TABLES="<table1>, <table2>, <table3>"
+
+# 本次真正写入的文件（相对项目根，一行一个）：只对它们替换占位符，
+# 并写进 .harness-starter-manifest，uninstall.sh 只删清单里的文件
+PLACED=""
+_record() { PLACED="${PLACED}${1#${TARGET_DIR}/}"$'\n'; }
 
 # --- 1. 移动 Tier 1 必装（直接拿来即用）---
 # 逐文件复制：目标文件已存在则跳过（保留用户修改），不存在则写入
@@ -281,6 +316,7 @@ _merge_dir() {
       skipped=$((skipped + 1))
     else
       cp "$f" "$target"
+      _record "$target"
       added=$((added + 1))
     fi
   done < <(find "$src" -type f -print0)
@@ -308,7 +344,7 @@ if [ "$INCLUDE_FRONTEND_DESIGN" -eq 1 ]; then
       if [ -e "${TARGET_DIR}/.claude/skills/${name}" ]; then
         echo "  ⚠️  ${name} 已存在，跳过"
       else
-        cp -r "$d" "${TARGET_DIR}/.claude/skills/"
+        _merge_dir "${d%/}" "${TARGET_DIR}/.claude/skills"
         echo "  ✅ ${name}"
       fi
     done
@@ -321,21 +357,32 @@ fi
 echo ""
 echo "[2/3] 移动 Tier 2 模板..."
 for f in AGENTS.md BACKEND_RULES.md FRONTEND_RULES.md dev.sh docker-compose.dev.yml CUSTOMIZE.md; do
-  if [ -e "${TARGET_DIR}/${f}" ]; then
+  if [ "$f" = FRONTEND_RULES.md ] && [ "$HAS_FRONTEND" -eq 0 ]; then
+    echo "  ⏭️  ${f}（纯后端项目，不需要）"
+  elif [ -e "${TARGET_DIR}/${f}" ]; then
     echo "  ⚠️  ${f} 已存在，跳过（参考 INSTALL.md Q2 手动合并）"
   else
     cp "${SCRIPT_DIR}/tier2-template/${f}" "${TARGET_DIR}/${f}"
+    _record "${TARGET_DIR}/${f}"
     echo "  ✅ ${f}"
   fi
 done
 
-# 拷贝 harness-orchestrator skill 到 .claude/skills/
+# 纯后端：去掉 compose 里 "# >>> frontend" 到 "# <<< frontend" 之间的前端服务和卷
+if [ "$HAS_FRONTEND" -eq 0 ] && printf '%s' "$PLACED" | grep -qx 'docker-compose.dev.yml'; then
+  _compose="${TARGET_DIR}/docker-compose.dev.yml"
+  awk '/# >>> frontend/{skip=1; next} /# <<< frontend/{skip=0; next} !skip' "$_compose" >"${_compose}.tmp" \
+    && mv "${_compose}.tmp" "$_compose"
+fi
+
+# 拷贝 harness-orchestrator skill 到 .claude/skills/（tier1 已带同名 skill 时以已装的为准）
 mkdir -p "${TARGET_DIR}/.claude/skills"
-if [ -e "${TARGET_DIR}/.claude/skills/harness-orchestrator" ]; then
+if printf '%s' "$PLACED" | grep -qx '.claude/skills/harness-orchestrator/SKILL.md'; then
+  echo "  ✅ .claude/skills/harness-orchestrator（Tier 1 已安装）"
+elif [ -e "${TARGET_DIR}/.claude/skills/harness-orchestrator" ]; then
   echo "  ⚠️  .claude/skills/harness-orchestrator 已存在，跳过"
 else
-  cp -r "${SCRIPT_DIR}/tier2-template/.claude/skills/harness-orchestrator" \
-     "${TARGET_DIR}/.claude/skills/"
+  _merge_dir "${SCRIPT_DIR}/tier2-template/.claude/skills/harness-orchestrator" "${TARGET_DIR}/.claude/skills"
   echo "  ✅ .claude/skills/harness-orchestrator"
 fi
 
@@ -343,56 +390,51 @@ fi
 echo ""
 echo "[3/3] 替换占位符..."
 
-# 收集所有目标文件（避免对 .git / node_modules / vendor 等做替换）
-TARGETS=$(find "${TARGET_DIR}" -type f \
-  \( -name 'AGENTS.md' -o -name 'BACKEND_RULES.md' -o -name 'FRONTEND_RULES.md' \
-     -o -name 'dev.sh' -o -name 'docker-compose.dev.yml' \
-     -o -path '*/.claude/skills/harness-orchestrator/*' \) \
-  2>/dev/null)
+# 占位符 → 变量名（一行一个）。值里有 / & | 空格都不需要转义
+PLACEHOLDERS="PROJECT_NAME PROJECT_DESC TECH_STACK BACKEND_PORT FRONTEND_PORT BACKEND_ROOT FRONTEND_ROOT
+FRONTEND_DIR BACKEND_PACKAGE JDK_IMAGE APP_MAIN_CLASS BASE_MODULE_1 BASE_MODULE_2 BASE_MODULE_3
+BUSINESS_MODULE_1 BUSINESS_MODULE_2 ENTRY_MODULE BASE_MODULES BUSINESS_MODULES DOMAIN_1 DOMAIN_2
+DOMAIN_3 DOMAIN_4 DOMAINS MODULES_SRC_PATHS KEY_TABLES"
 
-# 简单 sed 替换的占位符
-declare -A REPLACE=(
-  ["{{PROJECT_NAME}}"]="$PROJECT_NAME"
-  ["{{PROJECT_DESC}}"]="$PROJECT_DESC"
-  ["{{TECH_STACK}}"]="$TECH_STACK"
-  ["{{BACKEND_PORT}}"]="$BACKEND_PORT"
-  ["{{FRONTEND_PORT}}"]="$FRONTEND_PORT"
-  ["{{BACKEND_ROOT}}"]="$BACKEND_ROOT"
-  ["{{FRONTEND_ROOT}}"]="$FRONTEND_ROOT"
-  ["{{FRONTEND_DIR}}"]="$FRONTEND_DIR"
-  ["{{BACKEND_PACKAGE}}"]="$BACKEND_PACKAGE"
-  ["{{JDK_IMAGE}}"]="$JDK_IMAGE"
-  ["{{APP_MAIN_CLASS}}"]="$APP_MAIN_CLASS"
-  ["{{BASE_MODULE_1}}"]="$BASE_MODULE_1"
-  ["{{BASE_MODULE_2}}"]="$BASE_MODULE_2"
-  ["{{BASE_MODULE_3}}"]="$BASE_MODULE_3"
-  ["{{BUSINESS_MODULE_1}}"]="$BUSINESS_MODULE_1"
-  ["{{BUSINESS_MODULE_2}}"]="$BUSINESS_MODULE_2"
-  ["{{ENTRY_MODULE}}"]="$ENTRY_MODULE"
-  ["{{DOMAIN_1}}"]="$DOMAIN_1"
-  ["{{DOMAIN_2}}"]="$DOMAIN_2"
-  ["{{DOMAIN_3}}"]="$DOMAIN_3"
-  ["{{DOMAIN_4}}"]="$DOMAIN_4"
-  ["{{MODULES_SRC_PATHS}}"]="$MODULES_SRC_PATHS"
-  ["{{KEY_TABLES}}"]="$KEY_TABLES"
-)
-
-for f in $TARGETS; do
-  for key in "${!REPLACE[@]}"; do
-    val="${REPLACE[$key]}"
-    # 转义 sed 特殊字符（/ & |）
-    key_esc=$(printf '%s' "$key" | sed 's/[][\/.*^$]/\\&/g')
-    val_esc=$(printf '%s' "$val" | sed 's/[\/&|]/\\&/g')
-    sed -i "s|${key_esc}|${val_esc}|g" "$f" 2>/dev/null || true
+# 用 bash 自带的字符串替换，不用 sed -i（BSD/macOS 的 sed -i 语法不同，会悄悄失败）
+_replace_placeholders() {
+  local file=$1 content name
+  content="$(cat "$file"; printf x)"   # 末尾加 x 再去掉，保留文件末尾的换行
+  content="${content%x}"
+  for name in $PLACEHOLDERS; do
+    content="${content//"{{${name}}}"/${!name}}"
   done
-done
+  printf '%s' "$content" >"$file"
+}
+
+# 只处理本次安装写入的文件：用户原有的同名文件（上面"已存在，跳过"的）一律不碰
+REPLACED=0
+while IFS= read -r rel; do
+  case "$rel" in
+    AGENTS.md|BACKEND_RULES.md|FRONTEND_RULES.md|dev.sh|docker-compose.dev.yml|.claude/skills/harness-orchestrator/*)
+      if [ -f "${TARGET_DIR}/${rel}" ]; then
+        _replace_placeholders "${TARGET_DIR}/${rel}"
+        REPLACED=$((REPLACED + 1))
+      fi
+      ;;
+  esac
+done <<< "$PLACED"
+echo "  ✅ 已处理 ${REPLACED} 个文件"
 
 # --- 4. 给 dev.sh 加可执行权限 ---
 [ -f "${TARGET_DIR}/dev.sh" ] && chmod +x "${TARGET_DIR}/dev.sh"
 
 # --- 5. 写日志 ---
+# 安装清单：uninstall.sh 只删这里列出的文件（用户原有的文件不在清单里）
+MANIFEST_FILE="${TARGET_DIR}/.harness-starter-manifest"
 {
-  echo "Harness Starter applied at $(date -Iseconds)"
+  echo "# harness-starter 本次安装写入的文件（uninstall.sh 据此删除，请勿手动编辑）"
+  printf '%s' "$PLACED"
+  echo ".harness-starter-applied.log"
+} >>"$MANIFEST_FILE"
+
+{
+  echo "Harness Starter applied at $(date '+%Y-%m-%dT%H:%M:%S%z')"
   echo "PROJECT_NAME=$PROJECT_NAME"
   echo "TECH_STACK=$TECH_STACK"
   echo "MODULES=$MODULES"
@@ -416,14 +458,16 @@ done
 # --- 6. 自检：未替换的占位符 ---
 echo ""
 echo "[自检] 检测未替换的占位符..."
-REMAINING=$(grep -rn '{{[A-Z_]\+}}' \
-  "${TARGET_DIR}/AGENTS.md" \
-  "${TARGET_DIR}/BACKEND_RULES.md" \
-  "${TARGET_DIR}/FRONTEND_RULES.md" \
-  "${TARGET_DIR}/dev.sh" \
-  "${TARGET_DIR}/docker-compose.dev.yml" \
-  "${TARGET_DIR}/.claude/skills/harness-orchestrator/SKILL.md" \
-  2>/dev/null | grep -v '^$' || true)
+REMAINING=""
+while IFS= read -r rel; do
+  case "$rel" in
+    AGENTS.md|BACKEND_RULES.md|FRONTEND_RULES.md|dev.sh|docker-compose.dev.yml|.claude/skills/harness-orchestrator/*)
+      hits=$(grep -nE '\{\{[A-Z_0-9]+\}\}' "${TARGET_DIR}/${rel}" 2>/dev/null | sed "s|^|${rel}:|" || true)
+      [ -n "$hits" ] && REMAINING="${REMAINING}${hits}"$'\n'
+      ;;
+  esac
+done <<< "$PLACED"
+REMAINING="${REMAINING%$'\n'}"
 
 if [ -n "$REMAINING" ]; then
   echo "  ⚠️  以下占位符未被替换（init.sh 没覆盖到，按 CUSTOMIZE.md 手动改）："

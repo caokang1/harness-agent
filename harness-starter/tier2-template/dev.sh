@@ -27,6 +27,12 @@ FRONTEND_SERVICE="{{PROJECT_NAME}}-ui-dev"
 FRONTEND_DIR="${SCRIPT_DIR}/{{FRONTEND_DIR}}"
 APP_MAIN_CLASS="{{APP_MAIN_CLASS}}"   # 例：MyServiceApplication（用于 logs 检测启动成功）
 
+# 模块分工（check --arch 用，空格分隔；按 BACKEND_RULES.md §模块依赖方向 调整）
+BASE_MODULES="{{BASE_MODULES}}"          # 基础模块，自下而上：只能依赖排在它前面的基础模块
+BUSINESS_MODULES="{{BUSINESS_MODULES}}"  # 业务模块：互相不能依赖，只能依赖基础模块
+SRC_PATHS="{{MODULES_SRC_PATHS}}"        # 扫描 Java 源码的目录
+FRONTEND_DOMAINS="{{DOMAINS}}"           # 前端 src/views/ 下的业务域目录
+
 ERRORS_FOUND=0
 
 check_deps() {
@@ -115,10 +121,16 @@ case "$ACTION" in
       echo ""
       echo "[Arch] BACKEND_RULES.md 硬规则扫描..."
 
-      _check() {
-        local name="$1"; shift
-        local hit; hit=$("$@" 2>/dev/null || true)
-        if [ -n "$hit" ]; then
+      local skipped=0
+
+      # 输出一条规则的结果。第 3 个参数非空 = 没法检查（路径不存在等），
+      # 明确标成"跳过"，不能当成"无违规"，否则门禁会悄悄失效
+      _result() {
+        local name="$1" hit="$2" skip_reason="${3:-}"
+        if [ -n "$skip_reason" ]; then
+          echo "  ⚠️  [$name] 跳过：$skip_reason"
+          skipped=$((skipped + 1))
+        elif [ -n "$hit" ]; then
           echo "  ❌ [$name] 发现违规："
           echo "$hit" | sed 's/^/      /'
           arch_errors=$((arch_errors + 1))
@@ -128,30 +140,96 @@ case "$ACTION" in
         fi
       }
 
-      # --- 依赖方向（BACKEND_RULES.md §模块依赖方向） ---
-      # CUSTOMIZE: 把模块名换成你项目的业务模块 / 基础模块
-      _check "dep-business-cross" \
-        grep -E "implementation project\(':({{BUSINESS_MODULE_1}}|{{BUSINESS_MODULE_2}})'\)" \
-          {{BUSINESS_MODULE_1}}/build.gradle {{BUSINESS_MODULE_2}}/build.gradle
+      # 模块的构建文件：Gradle（Groovy / Kotlin DSL）或 Maven
+      _build_file() {
+        local f
+        for f in "$1/build.gradle" "$1/build.gradle.kts" "$1/pom.xml"; do
+          [ -f "$f" ] && { echo "$f"; return 0; }
+        done
+        return 1
+      }
 
-      _check "dep-base-to-business" \
-        grep -E "implementation project\(':({{BUSINESS_MODULE_1}}|{{BUSINESS_MODULE_2}}|{{BASE_MODULE_3}})'\)" \
-          {{BASE_MODULE_1}}/build.gradle {{BASE_MODULE_2}}/build.gradle
+      # 在构建文件里找对 $2.. 这些模块的依赖
+      _dep_hits() {
+        local file="$1" m; shift
+        for m in "$@"; do
+          case "$file" in
+            *.xml)  # 只看 <dependencies> 里的 artifactId
+              awk '/<dependencies>/{d=1} d{print FILENAME":"FNR": "$0} /<\/dependencies>/{d=0}' "$file" \
+                | grep -E "<artifactId>${m}</artifactId>" || true ;;
+            *)      # project(':m') / project(":m")，implementation / api / compileOnly 都算
+              grep -nE "project\([\"']:${m}[\"']\)" "$file" | sed "s|^|${file}:|" || true ;;
+          esac
+        done
+      }
+
+      # 依赖检查：$1 规则名，$2 被检查的模块，$3 每个模块禁止依赖的模块（函数名，参数是模块名）
+      _check_deps() {
+        local name="$1" modules="$2" forbidden_fn="$3"
+        local m bf hits="" missing="" checked=0
+        if [ -z "$modules" ]; then
+          _result "$name" "" "没有需要检查的模块（dev.sh 顶部的模块配置为空）"
+          return
+        fi
+        for m in $modules; do
+          if ! bf=$(_build_file "$m"); then
+            missing="${missing:+$missing, }$m"
+            continue
+          fi
+          checked=$((checked + 1))
+          local h
+          # shellcheck disable=SC2046
+          h=$(_dep_hits "$bf" $("$forbidden_fn" "$m"))
+          [ -n "$h" ] && hits="${hits:+$hits$'\n'}$h"
+        done
+        [ -n "$missing" ] && echo "  ⚠️  [$name] 找不到构建文件（build.gradle / build.gradle.kts / pom.xml）：$missing"
+        if [ "$checked" -eq 0 ]; then
+          _result "$name" "" "所有模块都找不到构建文件"
+        else
+          _result "$name" "$hits"
+        fi
+      }
+
+      _other_business() { local b; for b in $BUSINESS_MODULES; do [ "$b" != "$1" ] && echo "$b"; done; true; }
+      _base_forbidden() {  # 业务模块 + 排在它后面的基础模块
+        local b seen=0
+        echo "$BUSINESS_MODULES"
+        for b in $BASE_MODULES; do
+          [ "$seen" -eq 1 ] && echo "$b"
+          [ "$b" = "$1" ] && seen=1
+        done
+        true
+      }
+
+      # 源码扫描：只扫存在的目录；一个都不存在就标成跳过
+      _check_src() {
+        local name="$1"; shift
+        local p dirs=""
+        for p in $SRC_PATHS; do [ -d "$p" ] && dirs="$dirs $p"; done
+        if [ -z "$dirs" ]; then
+          _result "$name" "" "源码目录都不存在（$SRC_PATHS）"
+          return
+        fi
+        # shellcheck disable=SC2086
+        _result "$name" "$("$@" $dirs 2>/dev/null || true)"
+      }
+
+      # --- 依赖方向（BACKEND_RULES.md §模块依赖方向） ---
+      if [ "$(echo $BUSINESS_MODULES | wc -w)" -lt 2 ]; then
+        _result "dep-business-cross" "" "业务模块少于 2 个，无需检查"
+      else
+        _check_deps "dep-business-cross" "$BUSINESS_MODULES" _other_business
+      fi
+      _check_deps "dep-base-to-business" "$BASE_MODULES" _base_forbidden
 
       # --- 依赖注入（BACKEND_RULES.md §依赖注入与 Lombok） ---
-      _check "autowired-field-injection" \
-        grep -rn --include='*.java' '@Autowired' \
-          {{MODULES_SRC_PATHS}}
+      _check_src "autowired-field-injection" grep -rn --include='*.java' '@Autowired'
 
       # --- 异常契约（BACKEND_RULES.md §异常与响应契约） ---
-      _check "runtime-exception-in-business" \
-        grep -rn --include='*.java' 'throw new RuntimeException' \
-          {{MODULES_SRC_PATHS}}
+      _check_src "runtime-exception-in-business" grep -rn --include='*.java' 'throw new RuntimeException'
 
       # --- 时间类型（BACKEND_RULES.md §时间类型约定） ---
-      _check "legacy-date-api" \
-        grep -rnE --include='*.java' 'new Date\(\)|new SimpleDateFormat' \
-          {{MODULES_SRC_PATHS}}
+      _check_src "legacy-date-api" grep -rnE --include='*.java' 'new Date\(\)|new SimpleDateFormat'
 
       # --- 前端跨域 import（FRONTEND_RULES.md §文件职责边界） ---
       echo ""
@@ -161,8 +239,8 @@ case "$ACTION" in
       else
         local fe_hits=""
         # CUSTOMIZE: 把 domain 列表换成你前端 views/ 下的实际目录名
-        for d in {{DOMAIN_1}} {{DOMAIN_2}} {{DOMAIN_3}} {{DOMAIN_4}}; do
-          for other in {{DOMAIN_1}} {{DOMAIN_2}} {{DOMAIN_3}} {{DOMAIN_4}}; do
+        for d in $FRONTEND_DOMAINS; do
+          for other in $FRONTEND_DOMAINS; do
             [ "$d" = "$other" ] && continue
             [ ! -d "$FRONTEND_DIR/src/views/$d" ] && continue
             local h
@@ -194,8 +272,11 @@ case "$ACTION" in
       fi
 
       echo ""
+      if [ "$skipped" -gt 0 ]; then
+        echo "⚠️  [Arch] 有 $skipped 项检查被跳过，没有真正检查。请核对 dev.sh 顶部的模块配置。"
+      fi
       if [ $arch_errors -eq 0 ]; then
-        echo "✅ [Arch] 架构规则全部通过（基线）"
+        echo "✅ [Arch] 已检查的架构规则全部通过（基线）"
       else
         echo "❌ [Arch] 发现 $arch_errors 项违规"
         echo ""

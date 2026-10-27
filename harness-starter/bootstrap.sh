@@ -62,8 +62,12 @@ if ! git clone --depth=1 --branch "$REF" --quiet "$REPO_URL" "$TMPDIR" 2>/dev/nu
 fi
 
 # --- 透传参数给 init.sh ---
-if [ ! -x "$TMPDIR/init.sh" ]; then
-  echo "[bootstrap] ❌ 克隆内容异常：缺少 init.sh" >&2
+# 用 -f 而不是 -x：git 里 init.sh 不一定带可执行位，下面本来就用 bash 调用
+# 起步包可能在仓库根目录，也可能在仓库的 harness-starter/ 子目录
+STARTER_DIR="$TMPDIR"
+[ -f "$STARTER_DIR/init.sh" ] || STARTER_DIR="$TMPDIR/harness-starter"
+if [ ! -f "$STARTER_DIR/init.sh" ]; then
+  echo "[bootstrap] ❌ 克隆内容异常：仓库根目录和 harness-starter/ 下都没有 init.sh" >&2
   exit 1
 fi
 
@@ -71,6 +75,6 @@ TARGET_DIR="$(pwd)"
 echo "[bootstrap] 执行 init.sh（落地到 $TARGET_DIR）"
 echo "--------------------------------------------------------"
 # 告诉 init.sh 真正的项目根（starter 在 /tmp，不能用 $SCRIPT_DIR/.. 推断）
-HARNESS_TARGET_DIR="$TARGET_DIR" bash "$TMPDIR/init.sh" "$@"
+HARNESS_TARGET_DIR="$TARGET_DIR" bash "$STARTER_DIR/init.sh" "$@"
 echo "--------------------------------------------------------"
 echo "[bootstrap] ✅ 完成 · 临时目录已自动清理 · 项目根无 .harness-starter 残留"
