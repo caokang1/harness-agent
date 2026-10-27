@@ -63,7 +63,7 @@ description: "Use when a user just ran harness-starter init.sh and needs to comp
 
 | 目标文件 | 字段 | 填法 |
 |---------|------|------|
-| `BACKEND_RULES.md` | §模块依赖方向（占位图 / 分层说明） | 从 Step 2 扫各模块 `implementation project(':...')` 生成 ASCII 摘要；**拓扑只维护在后端规则**（与 mcp-gateway 瘦身版 AGENTS 对齐） |
+| `BACKEND_RULES.md` | §模块依赖方向（占位图 / 分层说明） | 从 Step 2 扫各模块 `implementation project(':...')` 生成 ASCII 摘要；**拓扑只维护在后端规则**（AGENTS.md 保持精简，不重复维护拓扑） |
 | `BACKEND_RULES.md` | DTO 包路径 | `{BACKEND_PACKAGE}.{module}.dto` 模板 |
 | `dev.sh` | docker 服务名 | `{PROJECT_NAME}-dev` 替换占位 |
 | `dev.sh` | 启动成功关键字 | `Started {AppMainClass}` |

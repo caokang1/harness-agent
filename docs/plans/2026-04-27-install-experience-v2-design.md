@@ -293,7 +293,7 @@ Stage 2 · init.sh --auto 扫描（A）
 ├── init.sh 加 --auto / --yes / --dry-run 三个 flag + source detect-project.sh
 ├── 更新 README.md / INSTALL.md 的快速开始示例
 ├── 更新 CUSTOMIZE.md（提示：装完后可以跑 finisher skill）
-├── 自验：mcp-gateway 副本跑 --auto --yes / 老参数路径跑通
+├── 自验：用真实项目的副本跑 --auto --yes / 老参数路径跑通
 └── commit: "feat: init.sh 新增 --auto 扫描模式，支持零参数自动装"
 
 Stage 3 · finisher skill（B）
@@ -320,7 +320,7 @@ Stage 3 · finisher skill（B）
 
 ### 测试策略
 
-用 `mcp-gateway` 的**副本**当白鼠（`git clone` 到 `/tmp` 再跑），避免污染真正的 mcp-gateway 工作区的 rules 和 skill。
+用一个真实项目的**副本**当白鼠（`git clone` 到 `/tmp` 再跑），避免污染真正的项目工作区的 rules 和 skill。
 
 ---
 

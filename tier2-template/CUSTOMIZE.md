@@ -20,7 +20,7 @@
 | 🔴 | 模块拓扑与依赖 | 见 `BACKEND_RULES.md` 占位 | 改成你项目的实际分层与合法依赖（AGENTS 已瘦身，拓扑只维护在后端规则里）|
 | 🔴 | 技术栈段 | `{{TECH_STACK}}` 首段 | 按实际版本改 |
 | 🟡 | 规则变更日志 | 仅 1 条示例 | 留空，让团队自己往里加 |
-| 🟢 | 项目缩写 | `mg`（MCP Gateway 缩写） | 通常用项目首字母 |
+| 🟢 | 项目缩写 | `ms`（如 my-service 的缩写） | 通常用项目首字母 |
 
 > 旧版模板曾带一段"起步包同步纪律"——用于 starter 与主项目同仓库时强制 `diff -r` 校验。**starter 独立仓库化后这段已移除**，因为你装完 starter 后那些文件就是你的，不再与上游有强耦合。如果你从旧版 starter 升级上来，可以直接删掉对应 AGENTS.md 段落。
 
@@ -49,10 +49,10 @@
 
 | 优先级 | 字段 | 默认 | 改成什么 |
 |------|------|------|---------|
-| 🔴 | 第 18-22 行 docker 服务名 | `mcp-gateway-dev`、`mcp-gateway-ui-dev` | 改成 `<your-project>-dev` |
-| 🔴 | `run_arch_check` 的 6 类规则的模块路径列表 | `mcp-gateway-{common,auth,...}/src/main/java` | 改成你项目的模块路径 |
-| 🔴 | `cmd_logs` 里"启动成功"日志关键字 | `Started McpGatewayApplication` | 改成你 Spring Boot 的应用类名 |
-| 🟡 | `cmd_verify_snapshot` 的关键业务表清单 | 13 张 mcp-gateway 业务表（占位） | 改成你项目的关键业务表（5~15 张为宜） |
+| 🔴 | 第 18-22 行 docker 服务名 | `my-service-dev`、`my-service-ui-dev` | 改成 `<your-project>-dev` |
+| 🔴 | `run_arch_check` 的 6 类规则的模块路径列表 | `my-service-{common,auth,...}/src/main/java` | 改成你项目的模块路径 |
+| 🔴 | `cmd_logs` 里"启动成功"日志关键字 | `Started MyServiceApplication` | 改成你 Spring Boot 的应用类名 |
+| 🟡 | `cmd_verify_snapshot` 的关键业务表清单 | 示例业务表（占位） | 改成你项目的关键业务表（5~15 张为宜） |
 | 🟡 | `cmd_test` 的 gradle 任务名 | `gradle test --tests <pattern>` | 如果用 Maven：改成 `mvn test -Dtest=<pattern>` |
 | 🟢 | 6 类规则本身 | 后端 6 条 + 前端 1 条 | 起步建议**全部保留**，跑出基线再看哪条不适用 |
 
@@ -71,9 +71,9 @@
 
 | 优先级 | 字段 | 默认 | 改成什么 |
 |------|------|------|---------|
-| 🔴 | services 的服务名 | `mcp-gateway-dev`、`mcp-gateway-ui-dev` | 改成 `<your-project>-dev` |
+| 🔴 | services 的服务名 | `my-service-dev`、`my-service-ui-dev` | 改成 `<your-project>-dev` |
 | 🔴 | 后端镜像 | `eclipse-temurin:17-jre` | 按你 JDK 版本 |
-| 🔴 | 后端启动命令 | 引用 `mcp-gateway-start` 模块 | 改成你的 main 模块 + 启动类 |
+| 🔴 | 后端启动命令 | 引用 `my-service-start` 模块 | 改成你的 main 模块 + 启动类 |
 | 🟡 | 端口映射 | 后端 `<后端端口>:<后端端口>`（并设 `SERVER_PORT`）、前端 `5173:5173` | 按需改 |
 | 🟡 | 数据库依赖 | 默认无（连外部 DB）| 如需本地 DB，加 `services.mysql/postgres` |
 | 🟢 | 网络 | `bridge` 默认 | 通常不动 |
@@ -97,35 +97,35 @@
 
 `dev.sh` 的核心改造（按段）：
 
-| 段 | mcp-gateway 原版 | Node 改造 |
+| 段 | Java 原版 | Node 改造 |
 |---|----------------|----------|
 | 编译 | `gradle compileJava` | `tsc --noEmit` 或 `npm run build` |
 | 测试 | `gradle test` | `jest` 或 `vitest` |
 | reload | Spring DevTools 触发 | `nodemon` / `tsx watch` |
-| 日志关键字 | `Started McpGatewayApplication` | `Server listening on port` |
+| 日志关键字 | `Started MyServiceApplication` | `Server listening on port` |
 | `@Autowired` 规则 | grep `@Autowired` | grep `@Inject()` 或 `useState/useContext` 误用模式 |
 | `RuntimeException` 规则 | grep `throw new RuntimeException` | grep `throw new Error('` |
 | 时间 API 规则 | grep `new Date\(\)|SimpleDateFormat` | grep `new Date\(\)` 而无时区参数 |
 
 ### Python（FastAPI / Django）
 
-| 段 | mcp-gateway 原版 | Python 改造 |
+| 段 | Java 原版 | Python 改造 |
 |---|----------------|------------|
 | 编译 | `gradle compileJava` | `python -m py_compile` 或 `mypy` |
 | 测试 | `gradle test` | `pytest` |
 | reload | DevTools 触发 | `uvicorn --reload` 或 `flask run --reload` |
-| 日志关键字 | `Started McpGatewayApplication` | `Uvicorn running on` 或 `Application startup complete` |
+| 日志关键字 | `Started MyServiceApplication` | `Uvicorn running on` 或 `Application startup complete` |
 | 字段注入规则 | grep `@Autowired` | grep 全局可变状态 / 单例滥用模式 |
 | `RuntimeException` 规则 | grep `throw new RuntimeException` | grep 裸 `raise Exception(` |
 
 ### Go
 
-| 段 | mcp-gateway 原版 | Go 改造 |
+| 段 | Java 原版 | Go 改造 |
 |---|----------------|---------|
 | 编译 | `gradle compileJava` | `go build ./...` |
 | 测试 | `gradle test` | `go test ./...` |
 | reload | DevTools 触发 | `air` 或 `reflex` |
-| 日志关键字 | `Started McpGatewayApplication` | 按你 main 里的 `log.Println` 改 |
+| 日志关键字 | `Started MyServiceApplication` | 按你 main 里的 `log.Println` 改 |
 | 字段注入规则 | grep `@Autowired` | grep 大写公开字段误用、循环依赖等 |
 
 **通用建议**：6 类 grep 规则的"反模式"思路在哪个语言都成立——只是**反模式的表达式不同**。把"项目最近 3-6 个月最容易踩的坑"列出来，逐条 grep 化即可。
@@ -170,14 +170,14 @@ rm -rf /tmp/hs
 
 ---
 
-## §F：项目特异 skill（主项目有，但不在起步包内）
+## §F：项目特异 skill（不在起步包内）
 
-mcp-gateway 上游还有 2 个 skill 没进 starter：
+起步包只收跨项目通用的方法论。只对某一个项目有用的 skill 不放进来，常见的有两类：
 
-| Skill | 为什么不进 starter |
+| 类型 | 为什么不进 starter |
 |------|---------------------|
-| `ent-mcp-operate-analysis` | mcp-gateway 特有的业务操作分析 skill（企业内 MCP 运营分析逻辑），跨项目零复用 |
-| `testCaseWriting-infra-DevOps` | 项目测试基建特有的测试用例写法 skill，跟 CI 流水线 / 测试框架强绑定 |
+| 业务分析类 skill | 绑定某个项目的业务逻辑和运营口径，跨项目无法复用 |
+| 测试用例编写类 skill | 跟具体的测试基建、CI 流水线、测试框架强绑定 |
 
 ### 你的项目也可能需要写类似的项目特异 skill
 
@@ -188,7 +188,7 @@ mcp-gateway 上游还有 2 个 skill 没进 starter：
 - 项目有**强 DSL / 框架**的特殊场景（比如自研 DSL、专有 CI 模板、特殊的测试数据生成逻辑）
 - 有一套**项目内通用但跨项目无用**的 SOP（比如你们团队特有的 release checklist）
 
-**怎么写？** 参考 mcp-gateway 上游 `ent-mcp-operate-analysis/SKILL.md` 和 `testCaseWriting-infra-DevOps/SKILL.md` 的结构（可在 mcp-gateway 仓库 `.claude/skills/` 下找到）——通常 3 段：
+**怎么写？** 一个 skill 通常 3 段：
 1. **Frontmatter**：`name` / `description`（触发词写准）
 2. **When to Use / When NOT to Use**：各 2-4 条
 3. **Process / Anti-Patterns / Examples**：主体步骤 + 反面示例

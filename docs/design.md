@@ -16,21 +16,21 @@
 
 ## 决策 2：独立仓库化 + 手动 cherry-pick，不做自动镜像
 
-starter 初版**物理抽自** `mcp-gateway` 主项目，初期两边是同 commit 同步的强耦合。独立仓库化后，这个设计改了：
+starter 初版**物理抽自**一个内部业务项目（下称"源项目"），初期两边是同 commit 同步的强耦合。独立仓库化后，这个设计改了：
 
 **为什么独立成仓库？**
-- 起步包的受众是**跨项目**的，放在 mcp-gateway 下面不利于发现和传播（别人得知道这个项目才能找到 starter）
-- 独立仓库有独立的 issue / MR 流，社区反馈不会混进 mcp-gateway 的业务讨论
-- 使用方一条 `git clone` 即可，不需要 clone 整个 mcp-gateway（后者是完整业务项目，体量大）
+- 起步包的受众是**跨项目**的，放在源项目里面不利于发现和传播（别人得知道这个项目才能找到 starter）
+- 独立仓库有独立的 issue / MR 流，社区反馈不会混进 源项目 的业务讨论
+- 使用方一条 `git clone` 即可，不需要 clone 整个源项目（完整业务项目，体量大）
 
 **为什么独立后不做自动镜像？**
-- starter 和 mcp-gateway 的演化节奏必然分化：starter 要追求**通用性**（让别的栈也能用），mcp-gateway 要追求**项目化**（特定业务约束）。强制双向同步反而会让两边都别扭
+- starter 和 源项目 的演化节奏必然分化：starter 要追求**通用性**（让别的栈也能用），源项目 要追求**项目化**（特定业务约束）。强制双向同步反而会让两边都别扭
 - 起步包的价值是"拷贝下来的那一刻已经自洽"——使用方根本不需要知道上游是谁，就像用脚手架生成的代码跟脚手架本身再无关系
 - 自动同步要维护一套跨仓库 diff / webhook / CI，**投入产出比**低
 
 **那两边怎么不腐烂？** 靠**手动 cherry-pick + 对账**：
-1. **单向为主**：mcp-gateway 的 skill / SOP / OpenSpec 模板改动有通用价值时，starter 维护者按 `SYNC.md` 流程 cherry-pick
-2. **反向选择性回传**：starter 收到社区反馈改的通用逻辑（比如更好的 grep 模式），如果对 mcp-gateway 也有用就回传
+1. **单向为主**：源项目 的 skill / SOP / OpenSpec 模板改动有通用价值时，starter 维护者按 `SYNC.md` 流程 cherry-pick
+2. **反向选择性回传**：starter 收到社区反馈改的通用逻辑（比如更好的 grep 模式），如果对 源项目 也有用就回传
 3. **季度对账**：每 3 个月跑一次 `diff -r` 检查，给 starter 列一份"可选采纳清单"，维护者 review 后决定是否合入
 
 详见 `SYNC.md`。
@@ -65,7 +65,7 @@ starter 初版**物理抽自** `mcp-gateway` 主项目，初期两边是同 comm
 
 **为什么主项目的 `.learnings/` 三个子文件（best_practice / correction / knowledge_gap）共 631 行，starter 里却只有空头部？**
 
-因为 learnings 内容**全是 mcp-gateway 项目特异的事故记录**（比如 `[LRN-2026-04-15-003] Mono.fromCallable 返回 null`），别人项目根本踩不到这些坑。直接拷过去会让使用者误以为"这些是必须遵守的规则"，反而污染他们的判断。
+因为 learnings 内容**全是源项目特有的事故记录**（比如 `[LRN-2026-04-15-003] Mono.fromCallable 返回 null`），别人项目根本踩不到这些坑。直接拷过去会让使用者误以为"这些是必须遵守的规则"，反而污染他们的判断。
 
 **保留的部分**：
 - `LEARNINGS.md` 索引模板（去掉具体条目数和 Categories 表的数据，留结构）

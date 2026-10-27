@@ -1,6 +1,8 @@
 # 安装指南
 
-> 全程 30 分钟内完成。前提：已有一个 git 仓库、本地装了 Docker（仅 Tier 2 的 `dev.sh` 需要）。
+> 全程 30 分钟内完成。前提：已有一个 git 仓库，装了 `bash`、`git`、`curl`；Docker 只有 Tier 2 的 `dev.sh` 需要。
+>
+> 更完整的说明（参数、日常使用、卸载）见 [使用文档](docs/USAGE.md)。
 
 ---
 
@@ -9,9 +11,9 @@
 ```bash
 cd /path/to/your-project
 
-bash <(curl -fsSL https://minio.example.com/your-bucket/harness-starter/install.sh) --auto
-# 扫出 7 个字段（project-name / modules / backend-package / tech-stack /
-# app-main-class / frontend-dir / backend-port）展示后交互确认
+bash <(curl -fsSL https://raw.githubusercontent.com/caokang1/harness-agent/main/bootstrap.sh) --auto
+# 扫出 8 个字段（project-name / modules / backend-package / tech-stack /
+# app-main-class / frontend-dir / backend-port / build-tool）展示后交互确认
 #
 # 前端占比高的项目再加 --include-frontend-design
 ```
@@ -28,8 +30,9 @@ bash <(curl -fsSL https://minio.example.com/your-bucket/harness-starter/install.
   5)  ✅  app-main-class     = MyAwesomeApplication
   6)  ✅  frontend-dir       = ../my-awesome-service-ui
   7)  ✅  backend-port       = 8080
+  8)  ✅  build-tool         = gradle
 
-确认：[回车] 接受并继续  [数字 1-7] 修改第 N 项  [q] 退出 >
+确认：[回车] 接受并继续  [数字 1-8] 修改第 N 项  [q] 退出 >
 ```
 
 **三种 `--auto` 的变体**：
@@ -43,7 +46,7 @@ bash <(curl -fsSL https://minio.example.com/your-bucket/harness-starter/install.
 ### 显式参数路径（CI 固定配置 / 老用法）
 
 ```bash
-bash <(curl -fsSL https://minio.example.com/your-bucket/harness-starter/install.sh) \
+bash <(curl -fsSL https://raw.githubusercontent.com/caokang1/harness-agent/main/bootstrap.sh) \
   --project-name="my-awesome-service" \
   --tech-stack="springboot+vue" \
   --modules="api,core,common,auth" \
@@ -56,15 +59,15 @@ bash <(curl -fsSL https://minio.example.com/your-bucket/harness-starter/install.
 
 **这条命令做了什么**：
 
-1. `curl` 把 `install.sh` 下载到一个**进程流**（不落盘到你项目）
-2. `bash <(...)` 执行 install：`install.sh` 是**自包含安装包**，内嵌了所有模板文件（base64 编码的 tar），**不需要 `git` 命令，不需要访问 GitLab**
-3. install 解压内嵌内容到系统临时目录，设 `HARNESS_TARGET_DIR=$(pwd)` 调用 `init.sh`——`init.sh` 把 `tier1/tier2` 的内容铺到你当前目录，`sed` 替换占位符
-4. 临时目录在结束时自动清理
+1. `curl` 把 `bootstrap.sh` 下载到一个**进程流**（不落盘到你项目）
+2. `bootstrap.sh` 把本仓库浅克隆到系统临时目录（指定版本用环境变量 `HARNESS_STARTER_REF`，取不到会直接报错，不会改装默认分支）
+3. 设 `HARNESS_TARGET_DIR=$(pwd)` 调用 `init.sh`——`init.sh` 把 `tier1/tier2` 的内容铺到你当前目录，并替换占位符
+4. 临时目录在结束时（包括出错、Ctrl+C）自动清理
 5. **结果**：你的项目根出现 `AGENTS.md` / `dev.sh` / `.claude/` / `.learnings/` / `docs/agents/` / `openspec/templates/`，但**看不到** `.harness-starter/`，也不用自己 `rm -rf`
 
-**前置条件**：`curl` + `bash` + `sed`（任何开发机都已具备，**不需要 git**）。
+**前置条件**：`curl` + `bash` + `git`。没有 `git` 的环境用下面的降级 B。
 
-**6 个最常用的参数**：
+**常用参数**（完整列表见 [使用文档 · 安装参数](docs/USAGE.md#3-安装参数)）：
 
 | 参数 | 含义 | 示例 |
 |------|------|------|
@@ -133,7 +136,7 @@ rm -rf .harness-starter           # 手动清理起步包目录（含它自己�
 **什么时候选这条路**：
 
 - 想在跑 `init.sh` 前先 `cat` 一遍所有模板、看清到底往仓库写了什么
-- 公司审计要求：安装前必须有本地副本 + 固定 commit sha
+- 审计要求：安装前必须有本地副本 + 固定 commit sha
 - 想改一两行 starter 的模板（例如调某条 grep 规则）再装
 
 ---
@@ -157,10 +160,10 @@ rm -rf .harness-starter
 **什么时候选这条路**：
 
 - CI 容器里没装 `git`（只有 `curl` + `tar`）
-- 内网代理只放行 HTTPS 下载，不放行 git 协议
-- 想固定某个 tag/branch：把 URL 里的 `main` 替换为 `v0.3.0` 等
+- 网络代理只放行 HTTPS 下载，不放行 git 协议
+- 想固定某个标签：把 URL 里的 `refs/heads/main` 换成 `refs/tags/<标签>`
 
-> **私仓 token**：如果 GitLab 仓库对你的 CI 身份不可匿名访问，把 URL 加上 `private_token=<PAT>` 或在 `curl -H "PRIVATE-TOKEN: <PAT>"`。
+> **私有副本**：如果你把起步包放在自己的私有仓库里，CI 身份不能匿名访问，就在 `curl` 里带上访问令牌，例如 GitHub 用 `-H "Authorization: token <PAT>"`，GitLab 用 `-H "PRIVATE-TOKEN: <PAT>"`。
 
 ---
 
@@ -168,12 +171,12 @@ rm -rf .harness-starter
 
 无论从哪条路径进来，最终都会调 `init.sh`。它：
 
-1. **移动** `tier1-direct/`（18 个通用 skill + SOP + learnings + 模板）到项目根
+1. **复制** `tier1-direct/`（20 个通用 skill + SOP + learnings + 模板）到项目根
 2. 按 `--include-frontend-design` / `--include-table-lineage` 可选移入 `tier1-direct-optional/` 里对应的 skill
-3. **移动** `tier2-template/`（`AGENTS.md` / RULES / `dev.sh` / CUSTOMIZE.md）到项目根
-4. 用 `sed` 替换所有 `{{PLACEHOLDER}}` 为参数值
-5. 给 `dev.sh` 加可执行权限
-6. 写入 `.harness-starter-applied.log`（装了什么、哪些参数）
+3. **复制** `tier2-template/`（`AGENTS.md` / RULES / `dev.sh` / CUSTOMIZE.md）到项目根
+4. 把本次写入的文件里的 `{{PLACEHOLDER}}` 替换为参数值（你原有的同名文件不碰）
+5. 给 `dev.sh` 加可执行权限；项目里没有 `.env` 时建一个只有注释的
+6. 写入 `.harness-starter-applied.log`（装了什么、哪些参数）和 `.harness-starter-manifest`（安装清单，卸载时只删清单里的文件）
 
 > 注意是 `cp` 不是 `mv`——`init.sh` 不破坏安装包源文件，同一套 `harness-starter` 可以重复向不同目录安装而不影响自身。
 
@@ -225,15 +228,15 @@ rm -rf /tmp/hs-ref
 **Q4：装完发现某条 grep 规则太严格，我项目跑不通怎么办？**
 A：直接改 `dev.sh` 注释掉那条 `_check`，并在 `BACKEND_RULES.md` 对应段加一行 `> 已禁用：<理由>`。规则可以随项目演进调整，但**改一条要在两个地方留痕**。
 
-**Q5：starter 独立仓库化后，mcp-gateway 的改动会自动同步过来吗？**
-A：**不会**。独立后两边各自演进，starter 的维护者手动 cherry-pick / 对账上游值得带进来的改动（策略见仓库内 [`docs/design.md`](./docs/design.md)）。你装了 starter 后也不需要跟任何上游同步——拷到你仓库的那一刻起，那就是你的文件。
+**Q5：装完之后需要和起步包保持同步吗？**
+A：**不需要**。拷到你仓库的那一刻起，那就是你的文件，可以随意修改。起步包以后有更新，你可以对比着手动挑选需要的改动合进来。
 
 **Q6：我想在 CI / Dockerfile 里自动装 starter，怎么做？**
 A：用降级 B（`curl | tar`），并**锁定一个 git tag**，例如：
 ```bash
-# Dockerfile 或 .gitlab-ci.yml
+# Dockerfile 或 CI 配置
 RUN mkdir -p .harness-starter \
-  && curl -fsSL https://.../archive/v0.3.0/harness-starter-v0.3.0.tar.gz \
+  && curl -fsSL https://github.com/caokang1/harness-agent/archive/refs/tags/<标签>.tar.gz \
      | tar -xz --strip-components=1 -C .harness-starter \
   && bash .harness-starter/init.sh --project-name=... \
   && rm -rf .harness-starter
