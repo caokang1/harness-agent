@@ -26,3 +26,7 @@
 
 # 本地 MinIO 上传配置（含凭据，绝不入库）
 scripts/.env.build
+
+# Python 缓存
+__pycache__/
+*.pyc
