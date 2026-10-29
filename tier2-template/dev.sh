@@ -49,6 +49,27 @@ check_deps() {
   fi
 }
 
+# 开发容器的名字和端口是固定的，同一时间只能有一个目录（主目录或某个 worktree）在用。
+# 启动前检查同名容器是不是别的目录的，是就说明情况并退出，而不是让 docker 报"名字已被占用"
+_container_owner() {   # 输出占用该容器名的 compose 项目目录；容器不存在时输出空
+  docker inspect "$1" 2>/dev/null \
+    | grep -o '"com.docker.compose.project.working_dir": *"[^"]*"' | head -1 \
+    | sed 's/.*: *"//; s/"$//' || true   # 容器不存在时 docker inspect 返回非 0，不能让 set -e 中断脚本
+}
+
+_ensure_containers_free() {
+  local svc owner
+  for svc in "$BACKEND_SERVICE" "$FRONTEND_SERVICE"; do
+    owner="$(_container_owner "$svc")"
+    if [ -n "$owner" ] && [ "$owner" != "$SCRIPT_DIR" ]; then
+      echo "[ERROR] 开发容器 $svc 正被另一个目录使用：$owner"
+      echo "        同一时间只能运行一个开发容器（容器名和端口是固定的）。"
+      echo "        先在那个目录执行 bash dev.sh stop，再回到这里启动。"
+      exit 1
+    fi
+  done
+}
+
 # 在后端容器里构建：$1 = compile | test，其余参数原样传给构建工具
 _build() {
   local action="$1"; shift
@@ -67,6 +88,7 @@ case "$ACTION" in
 
   start|up)
     check_deps
+    _ensure_containers_free
     echo "========================================"
     echo "  启动 {{PROJECT_NAME}} 开发容器"
     echo "========================================"
@@ -105,8 +127,8 @@ case "$ACTION" in
     ;;
 
   check)
-    check_deps
     CHECK_MODE="${2:---all}"
+    [ "$CHECK_MODE" = "--arch" ] || check_deps   # 架构检查只用 grep，不需要 Docker
 
     # ====================================================
     # Java 编译检查
@@ -175,16 +197,46 @@ case "$ACTION" in
         return 1
       }
 
+      # Maven 模块自己的 artifactId（目录叫 core、artifactId 叫 myapp-core 很常见）：
+      # 跳过 <parent> 段后的第一个 <artifactId>；读不到时退回目录名最后一段
+      _maven_artifact_id() {
+        local id=""
+        [ -f "$1/pom.xml" ] && id="$(awk '
+          /<parent>/ { p = 1 }
+          /<\/parent>/ { p = 0; next }
+          !p && match($0, /<artifactId>[^<]+<\/artifactId>/) {
+            s = substr($0, RSTART, RLENGTH); gsub(/<\/?artifactId>/, "", s); print s; exit
+          }' "$1/pom.xml")"
+        echo "${id:-${1##*/}}"
+      }
+
+      # Gradle 类型安全的项目访问器：目录 a/my-core 对应 projects.a.myCore
+      _gradle_accessor() {
+        echo "$1" | awk -F/ '{
+          out = "projects"
+          for (i = 1; i <= NF; i++) {
+            n = split($i, w, "-"); s = w[1]
+            for (j = 2; j <= n; j++) s = s toupper(substr(w[j], 1, 1)) substr(w[j], 2)
+            out = out "." s
+          }
+          print out
+        }'
+      }
+
       # 在构建文件里找对 $2.. 这些模块的依赖
       _dep_hits() {
-        local file="$1" m; shift
+        local file="$1" m path acc; shift
         for m in "$@"; do
           case "$file" in
-            *.xml)  # 只看 <dependencies> 里的 artifactId（嵌套模块 a/x 的 artifactId 一般是 x）
+            *.xml)  # 只看 <dependencies> 里的 artifactId，按被依赖模块自己 pom.xml 里的 artifactId 匹配
               awk '/<dependencies>/{d=1} d{print FILENAME":"FNR": "$0} /<\/dependencies>/{d=0}' "$file" \
-                | grep -E "<artifactId>${m##*/}</artifactId>" || true ;;
-            *)      # project(':m') / project(":m")，implementation / api / compileOnly 都算；嵌套模块目录 a/x 对应 :a:x
-              grep -nE "project\([\"']:${m//\//:}[\"']\)" "$file" | sed "s|^|${file}:|" || true ;;
+                | grep -F "<artifactId>$(_maven_artifact_id "$m")</artifactId>" || true ;;
+            *)      # implementation / api / compileOnly 都算；嵌套模块目录 a/x 对应 :a:x
+                    # 支持 project(':m')、project(path: ':m')、project(path = ":m")，以及 projects.m 访问器
+              path="${m//\//:}"
+              acc="$(_gradle_accessor "$m")"
+              grep -nE "project\((path *[:=] *)?[\"']:${path}[\"']|(^|[^A-Za-z0-9_.])${acc//./\\.}([^A-Za-z0-9_.]|$)" "$file" \
+                | sed "s|^|${file}:|" || true ;;
           esac
         done
       }
@@ -293,7 +345,7 @@ case "$ACTION" in
       if [ -d "${SCRIPT_DIR}/.harness-starter" ]; then
         echo ""
         echo "  ⚠️  [starter-leftover] 发现 .harness-starter/ 残留目录"
-        echo "      starter 装完后应该删除（参见 .harness-starter/INSTALL.md 第 5 步）："
+        echo "      starter 装完后应该删除："
         echo "      rm -rf .harness-starter"
       fi
 

@@ -34,6 +34,9 @@
 #   --yes                       配合 --auto 使用，跳过交互直接采用扫描结果（CI 用）
 #   --dry-run                   配合 --auto 使用，只输出扫描结果后退出，不装任何文件
 #   --build-tool=gradle|maven   构建工具；不传时按项目根的构建文件判断（有 Gradle 文件用 gradle，只有 pom.xml 用 maven）
+#   --modules=a,b,start         后端模块，按依赖从底到顶排列，最后一个是入口模块；单模块项目填 .
+#   --backend-port=8080 / --frontend-port=5173 / --app-main-class=XxxApplication
+#   --project-desc="一句话描述" / --jdk-image=<开发容器镜像>   这几项不传时用默认值或扫描结果
 #   --include-table-lineage     额外安装 table-lineage 库表血缘 skill（Java + MyBatis + MySQL
 #                               项目梳理"表从哪来、到哪去"；需要 Python 3.11+）
 #   --include-frontend-design   额外安装 frontend-design / ui-ux-pro-max 2 个前端 UI 设计 skill
@@ -46,13 +49,13 @@
 # 参数优先级（混用时）：显式参数 > --auto 扫描结果 > 默认值
 #
 # 环境变量：
-#   HARNESS_TARGET_DIR          覆盖"项目根"推断（bootstrap.sh 场景下使用）
-#                               未设时默认 = dirname(脚本)/..（对应直调场景）
+#   HARNESS_TARGET_DIR          指定安装到哪个项目（bootstrap.sh 场景下使用）
+#                               未设时默认 = 当前目录；在起步包目录里运行时取它的上一级
 #
 # 行为：
-#   1. 把 tier1-direct/（18 个通用 skill + SOP + learnings + 模板）移到项目根
-#   2. 按 --include-frontend-design / --include-table-lineage / --include-jenkins 可选移入 tier1-direct-optional/ 里对应的 skill（--include-zentao 另外在 .claude/settings.json 加计时钩子）
-#   3. 把 tier2-template/（AGENTS.md / RULES / dev.sh / CUSTOMIZE.md）移到项目根
+#   1. 把 tier1-direct/（20 个通用 skill + SOP + learnings + 模板）复制到项目根
+#   2. 按 --include-frontend-design / --include-table-lineage / --include-jenkins 可选复制 tier1-direct-optional/ 里对应的 skill（--include-zentao 另外在 .claude/settings.json 加计时钩子）
+#   3. 把 tier2-template/（AGENTS.md / RULES / dev.sh / CUSTOMIZE.md）复制到项目根
 #   4. 把本次写入文件里的 {{PLACEHOLDER}} 替换为参数值（用户原有的同名文件不碰）
 #   5. 给 dev.sh 加可执行权限
 #   6. 留下 .harness-starter-applied.log 记录和 .harness-starter-manifest 安装清单（卸载用）
@@ -118,9 +121,20 @@ for arg in "$@"; do
   esac
 done
 
+if [ "$AUTO" -eq 0 ] && { [ "$DRY_RUN" -eq 1 ] || [ "$YES" -eq 1 ]; }; then
+  echo "[ERROR] --dry-run 和 --yes 需要和 --auto 一起使用（不带 --auto 时会直接安装）"
+  exit 1
+fi
+
 # --- 计算路径（提前到扫描前，供扫描模块定位用）---
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-TARGET_DIR="${HARNESS_TARGET_DIR:-$(cd "${SCRIPT_DIR}/.." && pwd)}"
+if [ -n "${HARNESS_TARGET_DIR:-}" ]; then
+  TARGET_DIR="$HARNESS_TARGET_DIR"
+elif [ "$(pwd)" = "$SCRIPT_DIR" ]; then
+  TARGET_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"   # 在 .harness-starter/ 里运行时，装到它所在的项目
+else
+  TARGET_DIR="$(pwd)"
+fi
 
 # --- --auto 模式：扫描 + 交互式确认 ---
 if [ "$AUTO" -eq 1 ]; then
@@ -172,6 +186,11 @@ if [ "$AUTO" -eq 1 ]; then
 
   # --yes：跳过交互，直接采用
   if [ "$YES" -eq 0 ]; then
+    if [ ! -t 0 ]; then
+      echo ""
+      echo "[auto] 当前不是交互终端，没法确认扫描结果。确认上面的结果无误后，加 --yes 重新运行"
+      exit 1
+    fi
     while true; do
       echo ""
       read -r -p "确认：[回车] 接受并继续  [数字 1-8] 修改第 N 项  [q] 退出 > " choice
@@ -214,7 +233,11 @@ fi
 # --- 校验必填 ---
 if [ -z "$PROJECT_NAME" ] || [ -z "$MODULES" ]; then
   echo "[ERROR] 必填参数缺失：--project-name 和 --modules"
-  echo "        提示：可以使用 --auto 让 init.sh 从项目现场自动扫描"
+  if [ "$AUTO" -eq 1 ]; then
+    echo "        自动扫描没有识别出来，请用参数指定，例如 --modules=common,core,start（单模块项目填 --modules=.）"
+  else
+    echo "        提示：可以使用 --auto 让 init.sh 从项目现场自动扫描"
+  fi
   echo "运行 bash $(basename "$0") --help 查看用法"
   exit 1
 fi
@@ -259,6 +282,25 @@ MODULE_COUNT=${#MODULE_ARR[@]}
 if [ "$MODULE_COUNT" -eq 0 ]; then
   echo "[ERROR] --modules 里没有有效的模块名"
   exit 1
+fi
+
+# 模块是扫描出来的（不是用户显式给的顺序）时，把含 @SpringBootApplication 的模块挪到最后作为入口
+if ! is_explicit MODULES && [ "$MODULE_COUNT" -gt 1 ]; then
+  ENTRY_FOUND=""
+  for m in "${MODULE_ARR[@]}"; do
+    if [ -d "${TARGET_DIR}/${m}/src/main/java" ] \
+       && grep -rlqE '@SpringBootApplication' "${TARGET_DIR}/${m}/src/main/java" --include='*.java' 2>/dev/null; then
+      ENTRY_FOUND="${ENTRY_FOUND:+$ENTRY_FOUND }$m"
+    fi
+  done
+  # 只有唯一一个模块含启动类时才调整，多个时保持原顺序
+  if [ -n "$ENTRY_FOUND" ] && [ "${ENTRY_FOUND// /}" = "$ENTRY_FOUND" ] && [ "$ENTRY_FOUND" != "${MODULE_ARR[$((MODULE_COUNT - 1))]}" ]; then
+    REORDERED=()
+    for m in "${MODULE_ARR[@]}"; do [ "$m" = "$ENTRY_FOUND" ] || REORDERED+=("$m"); done
+    MODULE_ARR=("${REORDERED[@]}" "$ENTRY_FOUND")
+    MODULES="$(IFS=,; echo "${MODULE_ARR[*]}")"
+    echo "  入口模块   : ${ENTRY_FOUND}（含 @SpringBootApplication，已排到最后）"
+  fi
 fi
 
 # 模块分工（按 --modules 的顺序）：
@@ -310,14 +352,22 @@ case "$BUILD_TOOL" in
   gradle)
     : "${JDK_IMAGE:=gradle:8.12-jdk21}"
     BUILD_CACHE_DIR=/root/.gradle
-    BOOT_RUN_CMD="gradle :${ENTRY_MODULE//\//:}:bootRun --no-daemon"   # 嵌套模块目录 a/x 对应 :a:x
+    if [ "$ENTRY_MODULE" = "." ]; then
+      BOOT_RUN_CMD="gradle bootRun --no-daemon"                         # 单模块项目
+    else
+      BOOT_RUN_CMD="gradle :${ENTRY_MODULE//\//:}:bootRun --no-daemon"   # 嵌套模块目录 a/x 对应 :a:x
+    fi
     ;;
   maven)
     : "${JDK_IMAGE:=maven:3.9-eclipse-temurin-21}"
     BUILD_CACHE_DIR=/root/.m2
     # 入口模块要从本地仓库解析兄弟模块，所以先 install 再 spring-boot:run（不加 -q，启动时能看到构建进度）。
     # 因为兄弟模块是以 jar 加载的，改了它们必须重新 install 并重启：dev.sh reload 在 Maven 下会重启后端容器
-    BOOT_RUN_CMD="mvn -B install -DskipTests && mvn -B -pl ${ENTRY_MODULE} spring-boot:run"
+    if [ "$ENTRY_MODULE" = "." ]; then
+      BOOT_RUN_CMD="mvn -B spring-boot:run"                              # 单模块项目
+    else
+      BOOT_RUN_CMD="mvn -B install -DskipTests && mvn -B -pl ${ENTRY_MODULE} spring-boot:run"
+    fi
     ;;
   *)
     echo "[ERROR] --build-tool 只能是 gradle 或 maven（收到：$BUILD_TOOL）"
@@ -352,8 +402,27 @@ KEY_TABLES="<table1>, <table2>, <table3>"
 # 本次真正写入的文件（相对项目根，一行一个）：只对它们替换占位符，
 # 并写进 .harness-starter-manifest，uninstall.sh 只删清单里的文件
 PLACED=""
+# 每写入一个文件就立刻追加进安装清单：安装中途失败或被打断时，uninstall.sh 也知道该删哪些
+MANIFEST_FILE="${TARGET_DIR}/.harness-starter-manifest"
+MANIFEST_BEFORE=""
+[ -f "$MANIFEST_FILE" ] && MANIFEST_BEFORE="$(cat "$MANIFEST_FILE")"   # 之前装过时保留旧记录
+echo "# harness-starter 本次安装写入的文件（uninstall.sh 据此删除，请勿手动编辑）" >>"$MANIFEST_FILE"
+INSTALL_DONE=0
+_on_exit() {
+  if [ "$INSTALL_DONE" -eq 0 ] && [ -n "$PLACED" ]; then
+    echo ""
+    echo "[ERROR] 安装没有完成。已写入项目的文件都记在 .harness-starter-manifest 里，"
+    echo "        可以运行 uninstall.sh 清理后重新安装。"
+  fi
+}
+trap _on_exit EXIT
+trap 'exit 130' INT TERM
 # 前缀加引号：项目路径里有 [ * ? 时也按字面去掉，清单里记的才是相对路径
-_record() { PLACED="${PLACED}${1#"${TARGET_DIR}/"}"$'\n'; }
+_record() {
+  local rel="${1#"${TARGET_DIR}/"}"
+  PLACED="${PLACED}${rel}"$'\n'
+  printf '%s\n' "$rel" >>"$MANIFEST_FILE"
+}
 
 # --- 1. 移动 Tier 1 必装（直接拿来即用）---
 # 逐文件复制：目标文件已存在则跳过（保留用户修改），不存在则写入
@@ -512,13 +581,30 @@ echo "  ✅ 已处理 ${REPLACED} 个文件"
 [ -f "${TARGET_DIR}/dev.sh" ] && chmod +x "${TARGET_DIR}/dev.sh"
 
 # --- 5. 写日志 ---
-# 安装清单：uninstall.sh 只删这里列出的文件（用户原有的文件不在清单里）
-MANIFEST_FILE="${TARGET_DIR}/.harness-starter-manifest"
+# 安装清单：uninstall.sh 只删这里列出的文件（用户原有的文件不在清单里）。
+# 安装过程中已逐个记下路径，这里整体重写一遍，补上校验和：
+# 每行：路径<TAB>校验和。卸载时校验和对不上，说明安装后改过，会保留并提示，不直接删
 {
+  [ -n "$MANIFEST_BEFORE" ] && printf '%s\n' "$MANIFEST_BEFORE"
   echo "# harness-starter 本次安装写入的文件（uninstall.sh 据此删除，请勿手动编辑）"
-  printf '%s' "$PLACED"
+  while IFS= read -r rel; do
+    [ -n "$rel" ] || continue
+    if [ -f "${TARGET_DIR}/${rel}" ]; then
+      printf '%s\t%s\n' "$rel" "$(cksum <"${TARGET_DIR}/${rel}" | awk '{print $1}')"
+    else
+      printf '%s\n' "$rel"
+    fi
+  done <<< "$PLACED"
   echo ".harness-starter-applied.log"
-} >>"$MANIFEST_FILE"
+} >"$MANIFEST_FILE"
+
+# .harness/ 放进度、评审报告等本地记录，不应提交
+if [ -d "${TARGET_DIR}/.git" ] && ! grep -qxE '/?\.harness/?' "${TARGET_DIR}/.gitignore" 2>/dev/null; then
+  { [ -s "${TARGET_DIR}/.gitignore" ] && [ -n "$(tail -c1 "${TARGET_DIR}/.gitignore")" ] && echo ""
+    echo "# harness-starter：本地进度和评审记录"
+    echo ".harness/"; } >>"${TARGET_DIR}/.gitignore"
+  echo "  ✅ .gitignore 已加入 .harness/"
+fi
 
 {
   echo "Harness Starter applied at $(date '+%Y-%m-%dT%H:%M:%S%z')"
@@ -565,6 +651,8 @@ if [ -n "$REMAINING" ]; then
 else
   echo "  ✅ 所有 init.sh 范围内的占位符已替换"
 fi
+
+INSTALL_DONE=1
 
 echo ""
 echo "========================================"

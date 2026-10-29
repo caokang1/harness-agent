@@ -88,8 +88,8 @@
 ```
 WHAT_WAS_IMPLEMENTED: <实现摘要>
 PLAN_OR_REQUIREMENTS: <proposal.md / tasks.md 路径>
-BASE_SHA: <实现开始前的 commit>
-HEAD_SHA: $(git rev-parse HEAD)
+BASE_SHA: <实现开始前的 commit；verify 前不提交，通常就是当前 HEAD>
+HEAD_SHA: $(git rev-parse HEAD)（审查对象是工作区里未提交的改动：git diff BASE_SHA + git status 列出的新文件）
 CHECKLIST: 规模判定复审 / 架构合规证据 / 契约一致性 / 需求对齐 / 测试覆盖证据
 ```
 

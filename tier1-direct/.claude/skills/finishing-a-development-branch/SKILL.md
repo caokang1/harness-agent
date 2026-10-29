@@ -13,6 +13,8 @@ Guide completion of development work by presenting clear options and handling ch
 
 **Announce at start:** "I'm using the finishing-a-development-branch skill to complete this work."
 
+**Project rules first (AGENTS.md):** only start this skill after the user has verified the work and approved committing. If the work was done directly on the current branch (common for M-size changes, no feature branch), there is nothing to merge: finishing means committing and pushing after the user approves, then archiving. After option 1, push the base branch before archiving — archiving requires the code to be on the remote or in a PR. Merging and pushing (options 1 and 2) also need the user's explicit choice, and `openspec/changes/<name>/tasks.md` must be backfilled before any push.
+
 ## The Process
 
 ### Step 1: Verify Tests
@@ -135,7 +137,7 @@ Then: Cleanup worktree (Step 5)
 
 ### Step 5: Cleanup Worktree
 
-**For Options 1, 2, 4:**
+**For Options 1 and 4:**
 
 Check if in worktree:
 ```bash
@@ -147,7 +149,7 @@ If yes:
 git worktree remove <worktree-path>
 ```
 
-**For Option 3:** Keep worktree.
+**For Options 2 and 3:** Keep the worktree (a PR may still need changes; option 3 is unfinished).
 
 ## Quick Reference
 

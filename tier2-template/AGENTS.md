@@ -13,6 +13,14 @@
 
 **每次修改代码前**：先读对应层的规则文件，执行其「强制触发规则」里的问题清单，再动手。
 
+## 优先级（本文件高于任何 skill）
+
+`.claude/skills/` 里的方法论 skill 多数来自通用开源项目，部分步骤（自动 commit、push、合并分支、按工时判断规模）与本项目规则不同。**冲突时一律以本文件为准**：
+
+- 任何 skill 里的 `git commit` / `git push` / 合并分支步骤，都只能在**用户 verify 通过并明确同意后**执行；在此之前改动留在工作区。
+- 规模按本文件「规模判定」的结构性标准判断，不按 skill 里的工时或"是否行为变更"判断。
+- 测试命令用 `bash dev.sh test`，不用 skill 示例里的 pytest / npm test。
+
 ---
 
 ## 开发流程（按规模选择）
@@ -22,8 +30,8 @@
 | 规模 | 判定标准（满足任一即命中） | 路径 |
 |------|---------------------------|------|
 | **S** | **全部**满足：只改一层（前或后）/ 不改 API 契约 / 不加 schema / 不加模块依赖 / 改动 ≤ 3 个文件 | 直接编码 → check → reload → test → **等用户 verify** → commit |
-| **M** | 命中以下任一：改 API 契约（新/改请求参数或响应字段）/ 同时改前后端 / 新增数据库表或字段 / 新增模块间依赖 / 改动 > 3 个关联文件 | `openspec propose` → `openspec apply` → **交叉 Review** → **等用户 verify** → finish → archive |
-| **L** | 命中以下任一：新增模块 / 架构调整 / 跨多个 openspec change 协同 / 预计需要拆分 subagent 并行 / **新需求（来自产品或用户、无先例参考的诉求，即使代码改动面不大）** | brainstorming → openspec → worktree → plans → subagent-dev → **交叉 Review** → **等用户 verify** → finish → archive |
+| **M** | 命中以下任一：改 API 契约（新/改请求参数或响应字段）/ 同时改前后端 / 新增数据库表或字段 / 新增模块间依赖 / 改动 > 3 个关联文件 | `openspec propose` → `openspec apply` → **交叉 Review** → **等用户 verify** → finish（在当前分支开发时，即用户确认后提交并推送）→ archive |
+| **L** | 命中以下任一：新增模块 / 架构调整 / 跨多个 openspec change 协同 / 预计需要拆分 subagent 并行 / **新需求（来自产品或用户、无先例参考的诉求，即使代码改动面不大）** | brainstorming → openspec → worktree（同一时间只运行一个开发容器，见 `using-git-worktrees`）→ plans → subagent-dev → **交叉 Review** → **等用户 verify** → finish → archive |
 
 > **规模升级硬条件（命中任一，禁止走 S）**：
 > - 改 API 请求参数或响应字段
@@ -89,7 +97,7 @@
 
 完整 SOP → [`docs/agents/archive.md`](docs/agents/archive.md)。
 
-**触发**：`tasks.md` 全部达合法终态（`[x]`/`[~]+理由`，`[ ]` 禁止归档）+ 用户确认 + PR 已创建。  
+**触发**：`tasks.md` 全部达合法终态（`[x]`/`[~]+理由`，`[ ]` 禁止归档）+ 用户确认 + 代码已进入目标分支（本地合并后已推送，或在当前分支开发后已推送）或 PR 已创建。  
 **归档前**：4 步 precheck（tasks 无悬空 / spec 存在 / 残留清理 / TRACE 已写）→ `openspec archive`。  
 **每次 push 后**主动问用户"是否还有任务，否则归档"。
 
@@ -117,7 +125,7 @@
 | `openspec/` | 活跃变更 tasks / 元数据；`changes/archive/` 为 CLI 临时中转（归档后清空）|
 | `docs/plans/archive/` | **唯一归档目标**（tasks + design + TRACE.md）|
 | `docs/plans/architecture.md` | 架构文档（长期，不归档）|
-| `.claude/skills/` | Agent 技能唯一源（`.cursor/skills` 是软链）|
+| `.claude/skills/` | Agent 技能唯一源（Cursor 用户可自建软链：`ln -s ../.claude/skills .cursor/skills`）|
 | `.harness/progress.md` | 跨会话进度 |
 | `.learnings/` | 经验沉淀（ERRORS / LEARNINGS / FEATURE_REQUESTS）|
 

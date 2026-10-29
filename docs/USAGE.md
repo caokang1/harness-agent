@@ -135,7 +135,9 @@ rm -rf .harness-starter
 | `api,core,start` | api | core | start |
 | `common,start` | common | （无） | start |
 
-嵌套模块写成目录路径，例如 Gradle 的 `:services:order` 对应 `services/order`。分得不对也没关系，装完改 `dev.sh` 顶部的 `BASE_MODULES` / `BUSINESS_MODULES` 即可。
+嵌套模块写成目录路径，例如 Gradle 的 `:services:order` 对应 `services/order`。单模块项目（根目录就是唯一的模块）写 `--modules=.`，`--auto` 也会这样识别；这时没有模块间依赖可查，依赖规则会显示"跳过"。
+
+用 `--auto` 识别模块时，含 `@SpringBootApplication` 的模块会自动排到最后作为入口；显式传 `--modules` 时完全按你给的顺序。分得不对也没关系，装完改 `dev.sh` 顶部的 `BASE_MODULES` / `BUSINESS_MODULES` 即可。
 
 ## 4. 安装后收尾
 
@@ -173,6 +175,10 @@ git commit -m "chore: 引入 harness-starter"
 | L | 新模块、架构调整、全新需求 | 头脑风暴 → 提案 → 独立工作区 → 计划 → 分任务实现 → 评审 → 等你确认 → 归档 |
 
 拿不准时按 M 处理。
+
+M / L 流程会用到 [OpenSpec](https://github.com/Fission-AI/OpenSpec) 命令行工具（`openspec list`、`openspec status` 等）。用 `brew install openspec` 或 `npm install -g @fission-ai/openspec` 安装，再在项目根目录运行一次 `openspec init`。`openspec init` 可能会生成或覆盖 `.claude/skills/openspec-*`；起步包里的这几个 skill 按本包的归档规则改过，被覆盖后可以用 `git diff` 查看差异并恢复。
+
+`AGENTS.md` 的规则优先于所有 skill：skill 里如果有自动 commit、push、合并分支或按工时判断规模的步骤，一律按 `AGENTS.md` 执行，也就是你确认之前不提交。
 
 **提交规则**：AI 完成实现后必须停下来，出示实现摘要、测试结果和验证证据，**等你明确说"通过"才能提交**。
 
@@ -332,10 +338,12 @@ bash <(curl -fsSL https://raw.githubusercontent.com/caokang1/harness-agent/main/
 
 - 只删除安装清单 `.harness-starter-manifest` 里记录的文件，删完再清理因此变空的目录；
 - 你原有的文件（包括安装时"已存在，跳过"的那些）、`.claude/` 里你自己的设置和命令都不会动；
+- 安装后被你改过的文件（比如收尾时填过内容的 `AGENTS.md`）会保留并列出来，由你决定是否手动删除；
 - `.env` 只有在仍然只有注释时才删，填过变量的会保留并提示；
-- `.harness/` 目录（进度、评审记录）不删，需要的话手动处理。
+- 装过 `zentao` 的，会从 `.claude/settings.json` 里移除它添加的两个计时钩子，其余配置原样保留；
+- `.harness/` 目录（进度、评审记录）不删，需要的话手动处理；安装时加进 `.gitignore` 的 `.harness/` 一行也会保留。
 
-更早版本安装、没有清单的项目，只会删除 skill 目录、`docs/agents/`、`.learnings/`、`openspec/templates/`；`AGENTS.md` 等顶层文件无法确认归属，只列出来请你自己处理。
+更早版本安装、没有清单但有 `.harness-starter-applied.log` 的项目，只会删除 skill 目录、`docs/agents/`、`.learnings/`、`openspec/templates/`；`AGENTS.md` 等顶层文件无法确认归属，只列出来请你自己处理。清单和安装日志都没有时，判断不了是否装过，不会删除任何东西。
 
 ## 10. 团队自建分发（可选）
 

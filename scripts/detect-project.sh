@@ -126,11 +126,17 @@ detect_modules() {
     [ -d "$sub" ] || continue
     local base
     base="$(basename "$sub")"
-    case "$base" in .*|node_modules|dist|build|target|docs|scripts) continue ;; esac
+    case "$base" in .*|node_modules|dist|build|target|docs|scripts|buildSrc|gradle) continue ;; esac
     if [ -f "$sub/build.gradle" ] || [ -f "$sub/build.gradle.kts" ] || [ -f "$sub/pom.xml" ]; then
       modules="${modules:+$modules,}$base"
     fi
   done
+
+  # 4) 单模块项目：根目录就是模块（有构建文件和 src/main/java），用 . 表示
+  if [ -z "$modules" ] && [ -d "$dir/src/main/java" ] \
+     && { [ -f "$dir/build.gradle" ] || [ -f "$dir/build.gradle.kts" ] || [ -f "$dir/pom.xml" ]; }; then
+    modules="."
+  fi
   echo "$modules"
 }
 
@@ -144,7 +150,9 @@ detect_backend_package() {
   # 收集所有 package 声明
   local pkgs
   # 逐个文件读（不用 GNU 专有的 xargs -r，路径带空格也没问题）
-  pkgs="$(find "$dir" -path '*/src/main/java/*.java' -type f 2>/dev/null \
+  # 跳过起步包自身（克隆在 .harness-starter/ 时）和已安装 skill 里的示例代码，免得混进识别结果
+  pkgs="$(find "$dir" -path '*/src/main/java/*.java' -type f \
+      -not -path '*/.harness-starter/*' -not -path '*/.claude/*' 2>/dev/null \
     | head -n "$_HS_MAX_FILES" \
     | while IFS= read -r f; do grep -hE "^package[[:space:]]+" "$f" 2>/dev/null; done \
     | sed -E 's/^package[[:space:]]+([a-zA-Z0-9_.]+)[[:space:]]*;.*/\1/' \
@@ -238,6 +246,8 @@ detect_app_main_class() {
     --exclude-dir='build' \
     --exclude-dir='target' \
     --exclude-dir='node_modules' \
+    --exclude-dir='.harness-starter' \
+    --exclude-dir='.claude' \
     2>/dev/null | head -1)"
 
   if [ -n "$file" ]; then

@@ -11,6 +11,10 @@ IF A SKILL APPLIES TO YOUR TASK, YOU DO NOT HAVE A CHOICE. YOU MUST USE IT.
 This is not negotiable. This is not optional. You cannot rationalize your way out of this.
 </EXTREMELY-IMPORTANT>
 
+<PROJECT-RULES-WIN>
+The project's `AGENTS.md` overrides every skill. If a skill tells you to commit, push, merge, or size work by time, follow `AGENTS.md` instead: no `git commit` / `git push` / merge until the user has verified the work and explicitly approved.
+</PROJECT-RULES-WIN>
+
 ## How to Access Skills
 
 **In Claude Code:** Use the `Skill` tool. When you invoke a skill, its content is loaded and presented to you—follow it directly. Never use the Read tool on skill files.

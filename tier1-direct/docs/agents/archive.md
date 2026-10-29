@@ -4,7 +4,7 @@
 
 ## 触发时机
 
-**条件**：`tasks.md` 里所有条目达到**合法终态** + 用户确认实现完成 + PR 已创建。
+**条件**：`tasks.md` 里所有条目达到**合法终态** + 用户确认实现完成 + 代码已进入目标分支（本地合并后已推送，或在当前分支开发后已推送）或 PR 已创建。只是在本地合并、还没推送的，先推送再归档；选了「保持分支不动」的，等真正合入时再归档。
 
 **合法终态有两种**：
 
@@ -85,7 +85,7 @@
 ## 归档操作（三步）
 
 1. **OpenSpec 归档**：`openspec archive` 把 `openspec/changes/<name>/` 移动到 `openspec/changes/archive/YYYY-MM-DD-<name>/`
-2. **收集设计文档**：把 `docs/plans/` 根目录下本次变更的设计文档（`*-design.md`、`*-impl-plan.md`）移入 `openspec/changes/archive/YYYY-MM-DD-<name>/`
+2. **收集设计文档和计划**：把 `docs/plans/` 根目录下文件名带变更名的文件（`writing-plans` 生成的 `YYYY-MM-DD-<name>-impl-plan.md` 等）移入 `openspec/changes/archive/YYYY-MM-DD-<name>/`；剩下的 `*.md`（`architecture.md` 除外）列给用户确认哪些属于本次变更，比如按主题命名的 `*-design.md`
 3. **统一迁移 + 追溯元数据**：
    ```bash
    # 注意：mv source/* 不会移动隐藏文件（.openspec.yaml 等），用下面的写法一次到位
@@ -103,13 +103,13 @@
 
 每次归档完成后，**必须**检查并裁剪 `.harness/progress.md`：
 
-1. 数一下 `## Session` 段的数量
+1. 数一下会话段的数量（按 `session.md` 的模板，每段以 `## YYYY-MM-DD HH:mm — 主题` 开头）
 2. 只保留**最近 3 次**（按日期/编号排序），其余移入 `.harness/progress-archive/YYYY-MM.md`
 3. 更新"已归档会话"段的归档范围说明
 
 ```bash
 # 查看当前 session 数量
-grep -c "^## Session" .harness/progress.md
+grep -cE "^## [0-9]{4}-[0-9]{2}-[0-9]{2}" .harness/progress.md
 ```
 
 > **为什么是 3 次**：更早的 session 里的关键结论都已沉淀到 LEARNINGS.md / TRACE.md / AGENTS.md，

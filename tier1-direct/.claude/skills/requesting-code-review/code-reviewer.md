@@ -20,11 +20,12 @@ You are reviewing code changes for production readiness.
 ## Git Range to Review
 
 **Base:** {BASE_SHA}
-**Head:** {HEAD_SHA}
+**Head:** {HEAD_SHA} (changes may still be uncommitted — review the working tree)
 
 ```bash
-git diff --stat {BASE_SHA}..{HEAD_SHA}
-git diff {BASE_SHA}..{HEAD_SHA}
+git status --short          # also read any untracked (new) files it lists
+git diff --stat {BASE_SHA}
+git diff {BASE_SHA}          # base commit vs. working tree, including uncommitted changes
 ```
 
 ## Review Checklist

@@ -7,13 +7,13 @@ Use this template when dispatching a code quality reviewer subagent.
 **Only dispatch after spec compliance review passes.**
 
 ```
-Task tool (superpowers:code-reviewer):
+Task tool (general-purpose):
   Use template at requesting-code-review/code-reviewer.md
 
   WHAT_WAS_IMPLEMENTED: [from implementer's report]
   PLAN_OR_REQUIREMENTS: Task N from [plan-file]
-  BASE_SHA: [commit before task]
-  HEAD_SHA: [current commit]
+  BASE_SHA: [commit before the task started — usually current HEAD, since nothing is committed before user verify]
+  HEAD_SHA: [current HEAD; review the working tree]
   DESCRIPTION: [task summary]
 ```
 

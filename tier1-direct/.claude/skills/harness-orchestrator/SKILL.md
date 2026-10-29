@@ -52,8 +52,8 @@ End-to-end development pipeline that chains existing skills into a coherent work
 | 全新需求 | ① brainstorming |
 | 已有明确方案 | ② openspec propose |
 | 已有 OpenSpec change | ⑤ subagent-driven-development |
-| 小 bugfix（< 30min） | 直接编码 → check → reload → test → commit |
-| 紧急热修复 | 直接编码 → check → commit → deploy |
+| S 规模改动（按 AGENTS.md 结构性标准判定） | 直接编码 → check → reload → test → **等用户 verify** → commit |
+| 紧急热修复 | 直接编码 → check → test → **等用户 verify** → commit；发布由用户决定 |
 
 ## Process
 
@@ -193,7 +193,7 @@ The human does NOT:
 
 | Anti-Pattern | Correct Approach |
 |-------------|-----------------|
-| Skip brainstorming for large features | Always brainstorm when scope > 2 hours |
+| Skip brainstorming for large features | Always brainstorm for L-size work (structural criteria in AGENTS.md, not hours) |
 | Skip `dev.sh check` between tasks | Quality gate is mandatory per task |
 | Continue after test failures | Stop, debug, fix, then continue |
 | Forget to update progress.md | Always update at session end |

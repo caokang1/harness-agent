@@ -174,11 +174,12 @@ rm -rf .harness-starter
 无论从哪条路径进来，最终都会调 `init.sh`。它：
 
 1. **复制** `tier1-direct/`（20 个通用 skill + SOP + learnings + 模板）到项目根
-2. 按 `--include-frontend-design` / `--include-table-lineage` / `--include-jenkins` / `--include-zentao` 可选移入 `tier1-direct-optional/` 里对应的 skill
+2. 按 `--include-frontend-design` / `--include-table-lineage` / `--include-jenkins` / `--include-zentao` 可选复制 `tier1-direct-optional/` 里对应的 skill（`--include-zentao` 另外在 `.claude/settings.json` 加两个计时钩子）
 3. **复制** `tier2-template/`（`AGENTS.md` / RULES / `dev.sh` / CUSTOMIZE.md）到项目根
 4. 把本次写入的文件里的 `{{PLACEHOLDER}}` 替换为参数值（你原有的同名文件不碰）
 5. 给 `dev.sh` 加可执行权限；项目里没有 `.env` 时建一个只有注释的
-6. 写入 `.harness-starter-applied.log`（装了什么、哪些参数）和 `.harness-starter-manifest`（安装清单，卸载时只删清单里的文件）
+6. 写入 `.harness-starter-applied.log`（装了什么、哪些参数）和 `.harness-starter-manifest`（安装清单，记录每个文件的校验和；卸载时只删清单里、且安装后没改过的文件）
+7. 项目是 git 仓库时，在 `.gitignore` 里加一行 `.harness/`（本地进度和评审记录不提交）
 
 > 注意是 `cp` 不是 `mv`——`init.sh` 不破坏安装包源文件，同一套 `harness-starter` 可以重复向不同目录安装而不影响自身。
 
@@ -217,7 +218,7 @@ A：`init.sh` 会**跳过已存在的文件**并报警。手动合并：
 git clone --depth=1 https://github.com/caokang1/harness-agent.git /tmp/hs-ref
 diff -u AGENTS.md /tmp/hs-ref/tier2-template/AGENTS.md
 ```
-按需把 starter 里没有的段（比如规则变更日志）合并到你现有的文件。
+按需把 starter 里没有的段合并到你现有的文件。
 
 **Q3：我只想要 skill，不要 `dev.sh` / OpenSpec / `.learnings` 怎么办？**
 A：走降级 A 的"拿到本地副本"方式：
@@ -246,4 +247,4 @@ RUN mkdir -p .harness-starter \
 不要在 CI 里直接跑 `bash <(curl ...) bootstrap.sh` ——那等于每次都拉 `main`，构建不可复现。
 
 **Q7：install 跑到一半 `Ctrl+C` 了，会不会留下残骸？**
-A：临时目录会在进程退出时自动清理。**但是**如果 `init.sh` 已经开始 `cp` 了，**已经铺到你项目根的文件不会自动撤销**；在 git 仓库里重跑 `git status + git clean -fd` 即可恢复干净。
+A：临时目录会在进程退出时自动清理。**但是**如果 `init.sh` 已经开始 `cp` 了，**已经铺到你项目根的文件不会自动撤销**；在 git 仓库里先用 `git status` 查看，再用 `git clean -fd` 清掉未跟踪的新文件。**`git clean -fd` 会删除所有未跟踪的文件，运行前先确认里面没有你自己新建、还没提交的文件**（可先跑 `git clean -nd` 预览）。

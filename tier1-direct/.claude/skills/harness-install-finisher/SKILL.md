@@ -45,10 +45,10 @@ description: "Use when a user just ran harness-starter init.sh and needs to comp
 
 ### Step 2 · 扫项目代码补齐扫描维度
 
-用户跑 `init.sh --auto` 已扫过 7 个结构字段。本 skill 补扫：
+用户跑 `init.sh --auto` 已扫过 8 个结构字段。本 skill 补扫：
 
 ```
-- 模块间依赖（扫各模块 build.gradle 的 implementation project(':...')）
+- 模块间依赖（Gradle：扫各模块 build.gradle(.kts) 的 `project(':...')`；Maven：扫各模块 pom.xml 里指向兄弟模块的 `<dependency>`）
 - @Entity 类列表（verify-snapshot 表候选）
 - Flyway/Liquibase migration 文件（另一路表候选）
 - src/views/* 的子目录（前端 domain 候选）
@@ -63,20 +63,21 @@ description: "Use when a user just ran harness-starter init.sh and needs to comp
 
 | 目标文件 | 字段 | 填法 |
 |---------|------|------|
-| `BACKEND_RULES.md` | §模块依赖方向（占位图 / 分层说明） | 从 Step 2 扫各模块 `implementation project(':...')` 生成 ASCII 摘要；**拓扑只维护在后端规则**（AGENTS.md 保持精简，不重复维护拓扑） |
+| `BACKEND_RULES.md` | §模块依赖方向（占位图 / 分层说明） | 从 Step 2 扫到的模块依赖生成 ASCII 摘要；**拓扑只维护在后端规则**（AGENTS.md 保持精简，不重复维护拓扑） |
 | `BACKEND_RULES.md` | DTO 包路径 | `{BACKEND_PACKAGE}.{module}.dto` 模板 |
 | `dev.sh` | docker 服务名 | `{PROJECT_NAME}-dev` 替换占位 |
 | `dev.sh` | 启动成功关键字 | `Started {AppMainClass}` |
 | `dev.sh` | `run_arch_check` 模块路径 | Step 2 扫到的绝对路径列表展开 |
 | `docker-compose.dev.yml` | 服务名 / main 模块引用 | 从 `PROJECT_NAME` + `MODULES` 推 |
-| `harness-orchestrator/SKILL.md` | `{{PROJECT_NAME}}` | 直接替换 |
 
 **AUTO 的操作约定**：
 1. 每次填之前 `Read` 目标文件确认占位符（如 `{{...}}` 或"示范内容"）还在
 2. 已被用户手改过 → 跳过 + 记录到"用户已手改清单"
-3. 用 `StrReplace` 做替换，**绝不用 `sed`** 做多行复杂替换
+3. 用编辑工具做精确替换（Claude Code 的 `Edit`、Cursor 的 `StrReplace`），**绝不用 `sed`** 做多行复杂替换
 
-#### [ASK] 产品语义，AskQuestion 一次一项
+#### [ASK] 产品语义，提问工具一次一项
+
+> 提问工具：Claude Code 用 `AskUserQuestion`，Cursor 用 `AskQuestion`；都没有时直接在对话里问。下文统称 AskQuestion。
 
 | 目标文件 | 字段 | 启发式预填 + 问法 |
 |---------|------|-----------------|
@@ -84,7 +85,6 @@ description: "Use when a user just ran harness-starter init.sh and needs to comp
 | `FRONTEND_RULES.md` | **domain 列表** | 扫 `{FRONTEND_DIR}/src/views/*` 列所有候选，用 AskQuestion multi-select 让用户勾选 3-5 个真正有跨域约束的 |
 | `dev.sh` | **verify-snapshot 关键业务表** | 聚合 Step 2 的 `@Entity` + migration 里的所有表名，用 AskQuestion multi-select（`allow_multiple=true`），让用户勾选 5-15 张业务关键表 |
 | `AGENTS.md` | **项目简介段** | 3 问：「是什么？」「给谁用？」「当前状态？」（单独 3 条 AskQuestion 也可合并成一次收集） |
-| `harness-orchestrator/SKILL.md` | `{{ENTRY_HOOK}}` | 给 3 个示例（功能需求 / bugfix / 性能优化）让用户选触发姿势，或手写 |
 
 **ASK 的节奏约定**：
 - 一次只问一个字段（对齐 `brainstorming` skill 的节奏）
@@ -158,7 +158,7 @@ bash dev.sh check --arch
 
 - ❌ **不要**跳过前置条件检查直接开始扫描——可能误触发在已经手改过多次的项目上
 - ❌ **不要**把 AUTO 和 ASK 混成一次批量填——分开才能让用户 review 自动部分、交互补充语义部分
-- ❌ **不要**用 `sed` 做多行替换——`StrReplace` 更可靠；`sed` 只用于 `init.sh` 那种单行占位符
+- ❌ **不要**用 `sed` 做多行替换——编辑工具（`Edit` / `StrReplace`）更可靠；`sed` 只用于 `init.sh` 那种单行占位符
 - ❌ **不要**代用户 commit——即使 check --arch 全部通过。用户 review 才是最终关卡
 - ❌ **不要**在未装完 starter 的项目上跑——前置条件检查就是为了挡这个
 

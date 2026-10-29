@@ -135,7 +135,12 @@ if [ -n "$MINIO_ENDPOINT" ] && [ -n "$MINIO_ACCESS_KEY" ] && [ -n "$MINIO_SECRET
   echo "[build] 检测到 MinIO 配置，开始自动上传..."
   mc alias set "$ALIAS" "$MINIO_ENDPOINT" "$MINIO_ACCESS_KEY" "$MINIO_SECRET_KEY" --quiet
   mc cp "$OUTPUT" "$ALIAS/$MINIO_BUCKET/$MINIO_PATH"
-  mc anonymous set download "$ALIAS/$MINIO_BUCKET/$(dirname "$MINIO_PATH")/" 2>/dev/null || true
+  # 只开放安装包所在目录的匿名下载；路径没有目录部分时不改权限，避免把整个 bucket 设成公开
+  if [ "$(dirname "$MINIO_PATH")" != "." ]; then
+    mc anonymous set download "$ALIAS/$MINIO_BUCKET/$(dirname "$MINIO_PATH")/" 2>/dev/null || true
+  else
+    echo "[build] ⚠️  MINIO_PATH 没有目录部分，未设置匿名下载，请手动为该文件开放下载权限"
+  fi
   PUBLIC_URL="$MINIO_ENDPOINT/$MINIO_BUCKET/$MINIO_PATH"
   echo "[build] ✅ 上传完成：$PUBLIC_URL"
   echo ""

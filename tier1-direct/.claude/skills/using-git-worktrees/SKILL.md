@@ -13,6 +13,15 @@ Git worktrees create isolated workspaces sharing the same repository, allowing w
 
 **Announce at start:** "I'm using the using-git-worktrees skill to set up an isolated workspace."
 
+## With the project's dev container (dev.sh)
+
+The dev container's name and ports are fixed, so **only one checkout can run it at a time** — the main checkout or one worktree.
+
+- Before working in a worktree: run `bash dev.sh stop` in the main checkout, then `bash dev.sh start` inside the worktree. The worktree's container mounts the worktree's own files, so `dev.sh reload` / `test` there use the worktree's code.
+- When done (or switching back): `bash dev.sh stop` in the worktree, then `bash dev.sh start` in the main checkout.
+- `dev.sh start` refuses to start and names the other directory if the container is still owned by a different checkout.
+- Uncommitted files under `openspec/changes/<name>/` do not exist in a new worktree. Create the worktree before writing the OpenSpec proposal, or copy `openspec/changes/<name>/` into the worktree.
+
 ## Directory Selection Process
 
 Follow this priority order:
@@ -61,7 +70,7 @@ git check-ignore -q .worktrees 2>/dev/null || git check-ignore -q worktrees 2>/d
 
 **If NOT ignored:**
 
-Per Jesse's rule "Fix broken things immediately":
+Following the rule "Fix broken things immediately":
 1. Add appropriate line to .gitignore
 2. Commit the change
 3. Proceed with worktree creation
@@ -186,7 +195,7 @@ You: I'm using the using-git-worktrees skill to set up an isolated workspace.
 [Run npm install]
 [Run npm test - 47 passing]
 
-Worktree ready at /Users/jesse/myproject/.worktrees/auth
+Worktree ready at /path/to/myproject/.worktrees/auth
 Tests passing (47 tests, 0 failures)
 Ready to implement auth feature
 ```

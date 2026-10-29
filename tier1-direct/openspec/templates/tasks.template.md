@@ -48,7 +48,7 @@
 ## 5. 文档与规则
 
 - [ ] 5.1 更新 `BACKEND_RULES.md` 中 ... 段（如新增了规则）
-- [ ] 5.2 更新 `AGENTS.md` 中规则变更日志（仅当本次变更涉及 AGENTS.md 硬条款时）
+- [ ] 5.2 在 `docs/agents/rules-history.md` 记一条规则变更（仅当本次变更涉及 AGENTS.md 硬条款时）
 
 ## 6. 测试与 Verify
 

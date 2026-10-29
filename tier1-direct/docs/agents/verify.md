@@ -23,7 +23,7 @@ Agent 在宣布实现完成前，必须主动完成：
 Agent 自验通过后、进入用户验证之前，**切换角色为审查者**，执行交叉 Review。
 
 - **S 规模**：跳过本阶段，直接进入阶段二。
-- **M/L 规模**：必须完成。审查清单、产出模板、失败处理 → [`docs/agents/cross-review.md`](docs/agents/cross-review.md)。
+- **M/L 规模**：必须完成。审查清单、产出模板、失败处理 → [`docs/agents/cross-review.md`](cross-review.md)。
 
 **审查通过后**才能进入阶段二；审查不通过 → 退回修复 → 重新自验 → 复审。
 

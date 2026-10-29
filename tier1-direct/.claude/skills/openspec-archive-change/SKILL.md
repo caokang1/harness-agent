@@ -60,28 +60,31 @@ Archive a completed change in the experimental workflow.
    - Show a combined summary before prompting
 
    **Prompt options:**
-   - If changes needed: "Sync now (recommended)", "Archive without syncing"
-   - If already synced: "Archive now", "Sync anyway", "Cancel"
+   - If changes needed: "Archive and merge specs (recommended)", "Archive without merging specs"
+   - If already synced: "Archive now", "Cancel"
 
-   If user chooses sync, use Task tool (subagent_type: "general-purpose", prompt: "Use Skill tool to invoke openspec-sync-specs for change '<name>'. Delta spec analysis: <include the analyzed delta spec summary>"). Proceed to archive regardless of choice.
+   Spec merging is done by the `openspec archive` CLI in step 5a — do not edit `openspec/specs/` by hand. "Archive without merging specs" maps to `--skip-specs`.
 
 5. **Perform the archive（统一归档到 docs/plans/archive/）**
 
    Generate target name using current date: `YYYY-MM-DD-<change-name>`
 
-   **Step 5a — OpenSpec 归档（临时中转）**：
-   ```bash
-   mkdir -p openspec/changes/archive
-   mv openspec/changes/<name> openspec/changes/archive/YYYY-MM-DD-<name>
-   ```
+   归档方式与 `docs/agents/archive.md` 一致：先由 OpenSpec 命令归档并合并 specs，再整体迁到 `docs/plans/archive/`。不要用 `mv` 手动搬 `openspec/changes/<name>`，那样不会合并 specs。
 
-   **Step 5b — 收集设计文档**：
-   检查 `docs/plans/` 根目录下是否有本次变更的设计文档（`*-design.md`、`*-impl-plan.md`、`*-proposal.md`、`*-spec-*.md` 等），
-   如有，移入 `openspec/changes/archive/YYYY-MM-DD-<name>/`：
+   **Step 5a — OpenSpec 归档（合并 specs，临时中转）**：
    ```bash
-   mv docs/plans/YYYY-MM-DD-<name>*.md openspec/changes/archive/YYYY-MM-DD-<name>/ 2>/dev/null
-   mv docs/plans/<name>*.md openspec/changes/archive/YYYY-MM-DD-<name>/ 2>/dev/null
+   openspec archive <name> --yes                # 用户选了不合并 specs 时加 --skip-specs
+   ls -d openspec/changes/archive/*-<name>      # 记下实际生成的目录名（日期以命令生成的为准）
    ```
+   命令失败时停下来把输出给用户看，按 `docs/agents/archive.md` 的 precheck 清单排查，不要改用手动 `mv`。
+
+   **Step 5b — 收集设计文档和计划**：
+   1. 文件名里带变更名的，直接移入：
+      ```bash
+      for f in docs/plans/*<name>*.md; do [ -f "$f" ] && mv "$f" openspec/changes/archive/YYYY-MM-DD-<name>/; done
+      ```
+      `writing-plans` 按 `docs/plans/YYYY-MM-DD-<name>-impl-plan.md` 命名，会在这一步被收进来。
+   2. 再列出 `docs/plans/` 根目录下剩余的 `*.md`（`architecture.md` 除外），问用户其中有没有属于本次变更的，比如 brainstorming 按主题命名的 `*-design.md`。用户确认的再移入，不要猜。
 
    **Step 5c — 统一迁移到最终归档位置**：
    ```bash

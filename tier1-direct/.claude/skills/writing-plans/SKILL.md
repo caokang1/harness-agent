@@ -15,7 +15,7 @@ Assume they are a skilled developer, but know almost nothing about our toolset o
 1
 **Context:** This should be run in a dedicated worktree (created by brainstorming skill).
 
-**Save plans to:** `docs/plans/YYYY-MM-DD-<feature-name>.md`
+**Save plans to:** `docs/plans/YYYY-MM-DD-<change-name>-impl-plan.md`, where `<change-name>` is the OpenSpec change this plan implements (use the feature name when there is no change). Archiving collects plan files by the change name, so keep it in the filename.
 
 ## Bite-Sized Task Granularity
 
@@ -24,7 +24,7 @@ Assume they are a skilled developer, but know almost nothing about our toolset o
 - "Run it to make sure it fails" - step
 - "Implement the minimal code to make the test pass" - step
 - "Run the tests and make sure they pass" - step
-- "Commit" - step
+- "Run `bash dev.sh check --changed`" - step (no commit: commits happen only after user verify, per AGENTS.md)
 
 ## Plan Document Header
 
@@ -33,7 +33,7 @@ Assume they are a skilled developer, but know almost nothing about our toolset o
 ```markdown
 # [Feature Name] Implementation Plan
 
-> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
+> **For Claude:** REQUIRED SUB-SKILL: Use executing-plans to implement this plan task-by-task.
 
 **Goal:** [One sentence describing what this builds]
 
@@ -79,11 +79,10 @@ def function(input):
 Run: `pytest tests/path/test.py::test_name -v`
 Expected: PASS
 
-**Step 5: Commit**
+**Step 5: Checkpoint (no commit)**
 
 ```bash
-git add tests/path/test.py src/path/file.py
-git commit -m "feat: add specific feature"
+bash dev.sh check --changed
 ```
 ```
 
@@ -92,7 +91,7 @@ git commit -m "feat: add specific feature"
 - Complete code in plan (not "add validation")
 - Exact commands with expected output
 - Reference relevant skills with @ syntax
-- DRY, YAGNI, TDD, frequent commits
+- DRY, YAGNI, TDD, frequent checkpoints (commit only after the user verifies, per AGENTS.md)
 
 ## Execution Handoff
 
@@ -107,10 +106,10 @@ After saving the plan, offer execution choice:
 **Which approach?"**
 
 **If Subagent-Driven chosen:**
-- **REQUIRED SUB-SKILL:** Use superpowers:subagent-driven-development
+- **REQUIRED SUB-SKILL:** Use subagent-driven-development
 - Stay in this session
 - Fresh subagent per task + code review
 
 **If Parallel Session chosen:**
 - Guide them to open new session in worktree
-- **REQUIRED SUB-SKILL:** New session uses superpowers:executing-plans
+- **REQUIRED SUB-SKILL:** New session uses executing-plans
