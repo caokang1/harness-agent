@@ -40,6 +40,8 @@
 #                               （纯后端项目可不加；前端占比高的项目建议加）
 #   --include-jenkins           额外安装 jenkins-deploy skill（/jenkins-deploy 一条命令：用当前分支
 #                               触发已有的 Jenkins 任务，触发前先让用户确认；需要 Python 3.8+）
+#   --include-zentao            额外安装 zentao skill（/zentao 读禅道任务 / Bug、自动累计 AI 工时、
+#                               确认后完成任务或解决 Bug；会在 .claude/settings.json 加计时钩子；需要 Python 3.8+）
 #
 # 参数优先级（混用时）：显式参数 > --auto 扫描结果 > 默认值
 #
@@ -49,7 +51,7 @@
 #
 # 行为：
 #   1. 把 tier1-direct/（18 个通用 skill + SOP + learnings + 模板）移到项目根
-#   2. 按 --include-frontend-design / --include-table-lineage / --include-jenkins 可选移入 tier1-direct-optional/ 里对应的 skill
+#   2. 按 --include-frontend-design / --include-table-lineage / --include-jenkins 可选移入 tier1-direct-optional/ 里对应的 skill（--include-zentao 另外在 .claude/settings.json 加计时钩子）
 #   3. 把 tier2-template/（AGENTS.md / RULES / dev.sh / CUSTOMIZE.md）移到项目根
 #   4. 把本次写入文件里的 {{PLACEHOLDER}} 替换为参数值（用户原有的同名文件不碰）
 #   5. 给 dev.sh 加可执行权限
@@ -75,6 +77,7 @@ APP_MAIN_CLASS="ApplicationStarter"
 INCLUDE_FRONTEND_DESIGN=0   # --include-frontend-design 开启后把 D 的 2 个前端/UI skill 一起装上
 INCLUDE_TABLE_LINEAGE=0     # --include-table-lineage 开启后装 D 的库表血缘 skill
 INCLUDE_JENKINS=0           # --include-jenkins 开启后装 D 的 Jenkins 发布 skill
+INCLUDE_ZENTAO=0            # --include-zentao 开启后装 D 的禅道 skill 和计时钩子
 AUTO=0                      # --auto：开启项目现场自动扫描
 YES=0                       # --yes ：跳过交互直接采用扫描结果
 DRY_RUN=0                   # --dry-run：只打印扫描结果后退出
@@ -100,6 +103,7 @@ for arg in "$@"; do
     --include-frontend-design) INCLUDE_FRONTEND_DESIGN=1 ;;
     --include-table-lineage)   INCLUDE_TABLE_LINEAGE=1 ;;
     --include-jenkins)         INCLUDE_JENKINS=1 ;;
+    --include-zentao)          INCLUDE_ZENTAO=1 ;;
     --auto)                    AUTO=1 ;;
     --yes)                     YES=1 ;;
     --dry-run)                 DRY_RUN=1 ;;
@@ -420,6 +424,20 @@ if [ "$INCLUDE_JENKINS" -eq 1 ]; then
 else
   echo "[1b/3] 跳过 Jenkins 发布 skill（需要时加 --include-jenkins，见 CUSTOMIZE.md §D）"
 fi
+if [ "$INCLUDE_ZENTAO" -eq 1 ]; then
+  echo "[1b/3] 移动 Tier 1 可选（禅道 skill）..."
+  _install_optional zentao
+  ZENTAO_SCRIPT="${TARGET_DIR}/.claude/skills/zentao/scripts/zentao.py"
+  if command -v python3 >/dev/null 2>&1 && [ -f "$ZENTAO_SCRIPT" ]; then
+    # 计时钩子合并进项目的 .claude/settings.json，已有配置原样保留；卸载时只移除这两个钩子
+    python3 "$ZENTAO_SCRIPT" hooks install --settings "${TARGET_DIR}/.claude/settings.json" | sed 's/^/  ✅ /' \
+      || echo "  ⚠️  计时钩子没有装上，可稍后运行：python3 .claude/skills/zentao/scripts/zentao.py hooks install"
+  else
+    echo "  ⚠️  未找到 python3，计时钩子没有装上；装好 Python 3.8+ 后运行：python3 .claude/skills/zentao/scripts/zentao.py hooks install"
+  fi
+else
+  echo "[1b/3] 跳过禅道 skill（需要时加 --include-zentao，见 CUSTOMIZE.md §D）"
+fi
 
 # --- 2. 复制 Tier 2（带占位符）---
 echo ""
@@ -512,6 +530,7 @@ MANIFEST_FILE="${TARGET_DIR}/.harness-starter-manifest"
   echo "INCLUDE_FRONTEND_DESIGN=$INCLUDE_FRONTEND_DESIGN"
   echo "INCLUDE_TABLE_LINEAGE=$INCLUDE_TABLE_LINEAGE"
   echo "INCLUDE_JENKINS=$INCLUDE_JENKINS"
+  echo "INCLUDE_ZENTAO=$INCLUDE_ZENTAO"
   echo ""
   echo "Files placed:"
   echo "  AGENTS.md"

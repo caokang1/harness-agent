@@ -80,6 +80,7 @@ bash <(curl -fsSL https://raw.githubusercontent.com/caokang1/harness-agent/main/
 | `--include-frontend-design` | 额外装 `frontend-design` / `ui-ux-pro-max` 2 个前端 skill | *（flag，无值）* |
 | `--include-table-lineage` | 额外装 `table-lineage` 库表血缘 skill（需 Python 3.11+） | *（flag，无值）* |
 | `--include-jenkins` | 额外装 `jenkins-deploy` Jenkins 发布 skill（需 Python 3.8+） | *（flag，无值）* |
+| `--include-zentao` | 额外装 `zentao` 禅道 skill，并在 `.claude/settings.json` 加计时钩子（需 Python 3.8+） | *（flag，无值）* |
 
 跑完之后，二选一：
 
@@ -173,7 +174,7 @@ rm -rf .harness-starter
 无论从哪条路径进来，最终都会调 `init.sh`。它：
 
 1. **复制** `tier1-direct/`（20 个通用 skill + SOP + learnings + 模板）到项目根
-2. 按 `--include-frontend-design` / `--include-table-lineage` / `--include-jenkins` 可选移入 `tier1-direct-optional/` 里对应的 skill
+2. 按 `--include-frontend-design` / `--include-table-lineage` / `--include-jenkins` / `--include-zentao` 可选移入 `tier1-direct-optional/` 里对应的 skill
 3. **复制** `tier2-template/`（`AGENTS.md` / RULES / `dev.sh` / CUSTOMIZE.md）到项目根
 4. 把本次写入的文件里的 `{{PLACEHOLDER}}` 替换为参数值（你原有的同名文件不碰）
 5. 给 `dev.sh` 加可执行权限；项目里没有 `.env` 时建一个只有注释的

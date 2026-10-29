@@ -132,9 +132,9 @@
 
 ---
 
-## §D：可选 skill（前端/UI 设计、库表血缘、Jenkins 打包）
+## §D：可选 skill（前端/UI 设计、库表血缘、Jenkins 发布、禅道）
 
-本起步包的 `tier1-direct-optional/.claude/skills/` 下有 4 个可选 skill，按开关分三组安装：
+本起步包的 `tier1-direct-optional/.claude/skills/` 下有 5 个可选 skill，按开关分四组安装：
 
 | Skill | 用途 | 建议 |
 |------|------|------|
@@ -142,8 +142,9 @@
 | `ui-ux-pro-max` | UI/UX 设计智能（50 种风格、21 种配色、50 种字体组合、20 种图表、9 种 stack），集成 shadcn/ui MCP 组件搜索 | **有独立 UI/UX 设计需求才启用**（会让 AI 在 UI 设计场景介入得更深）|
 | `table-lineage` | 从 Java / Spring / MyBatis 代码加 MySQL 元数据生成可交互的库表血缘页面（谁写、从哪取数、谁在读、业务域、ER 图），准确率用人工标准答案实测 | **要梳理报表来源、做数据字典 / ER 图时启用**；需要 Python 3.11+，直连数据库还需 `mysql` 客户端；工作目录放在代码仓库外 |
 | `jenkins-deploy` | `/jenkins-deploy` 一条命令：按当前仓库找到 Jenkins 任务，用当前分支 / 标签推断参数，把任务、参数、提交发给你确认，同意后才触发并在后台监控结果 | **项目已经用 Jenkins 构建 / 发布时启用**；需要 Python 3.8+（只用标准库）。个人凭据写在 `~/.config/jenkins-deploy/config.json`，项目默认任务写在仓库根的 `.jenkins-deploy.json` |
+| `zentao` | `/zentao <编号或链接>`：读禅道任务（含关联需求、验收标准）或 Bug，开始任务并自动累计 AI 工作时间；做完把工时给你确认（可改），确认后完成任务，或把 Bug 标为已解决（开源版 Bug 不能记工时，耗时写进解决备注） | **团队用禅道管理任务时启用**；需要 Python 3.8+（只用标准库）。账号写在 `~/.config/zentao/config.json`；安装时会在 `.claude/settings.json` 加两个计时钩子，卸载时自动移除 |
 
-开关：`--include-frontend-design` 装前两个，`--include-table-lineage` 装 `table-lineage`，`--include-jenkins` 装 `jenkins-deploy`，可以同时加。
+开关：`--include-frontend-design` 装前两个，`--include-table-lineage` 装 `table-lineage`，`--include-jenkins` 装 `jenkins-deploy`，`--include-zentao` 装 `zentao`，可以同时加。
 
 ### 启用方式（两种）
 

@@ -120,6 +120,7 @@ rm -rf .harness-starter
 | `--include-frontend-design` | `frontend-design`、`ui-ux-pro-max`（前端界面与 UI/UX 设计） |
 | `--include-table-lineage` | `table-lineage`（库表血缘分析，需 Python 3.11+） |
 | `--include-jenkins` | `jenkins-deploy`（`/jenkins-deploy` 一条命令触发已有的 Jenkins 任务） |
+| `--include-zentao` | `zentao`（`/zentao` 读禅道任务 / Bug，累计 AI 工时，确认后完成任务或解决 Bug） |
 
 ### 模块分工
 
@@ -284,6 +285,32 @@ AI 会一口气做完下面几步，中间只停一次等你确认：
 ```
 
 只依赖 Python 3.8+ 标准库。离线自测：`python3 .claude/skills/jenkins-deploy/scripts/run_tests.py`。该 skill 改编自 ABCFed/claude-marketplace（MIT License）。
+
+### zentao（`--include-zentao`）
+
+从禅道领任务或 Bug 给 AI 做，做完自动填工时、推进状态。在 Claude Code 里输入：
+
+```
+/zentao 123                                   # 任务
+/zentao B45                                   # Bug
+/zentao http://禅道地址/zentao/task-view-123.html   # 也可以直接贴链接
+```
+
+1. **读需求**：任务读描述、关联需求和验收标准；Bug 读重现步骤。
+2. **开始**：任务在禅道里标成"进行中"，Bug 不改状态，两者都开始计时。
+3. **干活**：按 `AGENTS.md` 的流程实现，修 Bug 时走系统化调试，直到你验证通过、代码提交。
+4. **确认工时**：AI 列出每段工作的时间和内容，给出建议工时。你回复"确认"，或者直接回复一个小时数来修改，只问一次。
+5. **完成**：任务记工时并标成"已完成"。Bug 标成"已解决"（解决版本"主干"），指派回提 Bug 的人，耗时写进解决备注，因为开源版禅道不能在 Bug 上记工时。
+
+计时只算 AI 在干活的时间。安装时会在 `.claude/settings.json` 里加两个钩子，每轮对话开始和结束时各打一个时间戳。等你回复的时间、关掉会话的时间都不算，跨会话、跨天自动累加。中途切去做别的事时，对 AI 说"暂停计时"。计时记录在 `~/.cache/zentao/`，不进仓库。
+
+账号写在 `~/.config/zentao/config.json`（chmod 600）：
+
+```json
+{"url": "http://禅道地址/zentao", "account": "<账号>", "password": "<密码>", "allow_http": true}
+```
+
+只能用 http 访问的禅道必须写 `"allow_http": true`，因为密码会明文传输；能用 https 就用 https，并去掉这一项。离线自测：`python3 .claude/skills/zentao/scripts/run_tests.py`。
 
 ### render-graphs.js（随 `writing-skills` 安装）
 

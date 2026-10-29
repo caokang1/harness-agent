@@ -15,6 +15,7 @@
 #     只删 harness 的 skill 目录、docs/agents/、.learnings/、openspec/templates/；
 #     AGENTS.md、dev.sh 等顶层文件无法确认是不是你自己的，只列出来请你手动处理
 #   之后删掉因此变空的目录（只删空目录，.claude/ 里你自己的设置、命令、钩子不会动）
+#   装过 zentao skill 的，从 .claude/settings.json 里移除它加的两个计时钩子，其余配置原样保留
 #
 # 不删除：
 #   项目原有的 docs/、openspec/、.claude/ 里的其他内容
@@ -70,6 +71,7 @@ HARNESS_SKILLS=(
   ui-ux-pro-max
   table-lineage
   jenkins-deploy
+  zentao
 )
 LEGACY_DIRS=("docs/agents" ".learnings" "openspec/templates")
 LEGACY_FILES=("AGENTS.md" "BACKEND_RULES.md" "FRONTEND_RULES.md" "dev.sh" "docker-compose.dev.yml" "CUSTOMIZE.md")
@@ -124,7 +126,16 @@ if [ ${#DELETE_FILES[@]} -eq 0 ] && [ ${#DELETE_DIRS[@]} -eq 0 ] && [ ${#MANUAL[
   exit 0
 fi
 
+# zentao skill 在 .claude/settings.json 里加过计时钩子：删除 skill 前先移除，不然钩子会指向不存在的脚本
+ZENTAO_SCRIPT="${TARGET_DIR}/.claude/skills/zentao/scripts/zentao.py"
+SETTINGS_FILE="${TARGET_DIR}/.claude/settings.json"
+ZENTAO_HOOKS=0
+if [ -f "$SETTINGS_FILE" ] && grep -q 'zentao/scripts/zentao.py' "$SETTINGS_FILE"; then
+  ZENTAO_HOOKS=1
+fi
+
 echo "将要删除："
+[ "$ZENTAO_HOOKS" -eq 1 ] && echo "  [HOOK] .claude/settings.json 里的禅道计时钩子（其余配置保留）"
 for d in ${DELETE_DIRS[@]+"${DELETE_DIRS[@]}"}; do echo "  [DIR ] $d"; done
 for f in ${DELETE_FILES[@]+"${DELETE_FILES[@]}"}; do echo "  [FILE] $f"; done
 if [ ${#MANUAL[@]} -gt 0 ]; then
@@ -155,6 +166,14 @@ fi
 
 echo ""
 echo "正在清除..."
+
+if [ "$ZENTAO_HOOKS" -eq 1 ]; then
+  if command -v python3 >/dev/null 2>&1 && [ -f "$ZENTAO_SCRIPT" ]; then
+    python3 "$ZENTAO_SCRIPT" hooks uninstall --settings "$SETTINGS_FILE" | sed 's/^/  ✅ /'
+  else
+    echo "  ⚠️  无法自动移除禅道计时钩子（缺少 python3），请手动删除 .claude/settings.json 里含 zentao.py track 的两项"
+  fi
+fi
 
 PARENTS=""
 for d in ${DELETE_DIRS[@]+"${DELETE_DIRS[@]}"}; do
