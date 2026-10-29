@@ -20,7 +20,7 @@
 | `.claude/skills/`（20 个） | 头脑风暴、写计划、TDD、系统化调试、代码评审、完成前验证、OpenSpec 需求变更等方法论 |
 | `docs/agents/`、`.learnings/`、`openspec/templates/` | 会话 / 验证 / 归档的操作规程、经验沉淀模板、需求文档模板 |
 
-可选再装：前端设计（`frontend-design`、`ui-ux-pro-max`）、库表血缘分析（`table-lineage`）。
+可选再装：前端设计（`frontend-design`、`ui-ux-pro-max`）、库表血缘分析（`table-lineage`）、Jenkins 发布（`jenkins-deploy`：`/jenkins-deploy` 一条命令用当前分支触发已有任务，发送前先让你确认）。
 
 ## 快速开始
 
@@ -62,6 +62,7 @@ bash dev.sh check --arch
 bash <(curl -fsSL .../bootstrap.sh) --auto --dry-run              # 只看识别结果，不安装
 bash <(curl -fsSL .../bootstrap.sh) --auto --yes                  # 不询问，直接采用（CI 用）
 bash <(curl -fsSL .../bootstrap.sh) --auto --include-table-lineage # 加装库表血缘 skill
+bash <(curl -fsSL .../bootstrap.sh) --auto --include-jenkins       # 加装 Jenkins 发布 skill
 ```
 
 不想用一行命令，也可以 `git clone` 下来审阅后再装，见 [使用文档 · 安装](docs/USAGE.md#2-安装)。
@@ -97,7 +98,7 @@ bash <(curl -fsSL https://raw.githubusercontent.com/caokang1/harness-agent/main/
 │   ├── docs/agents/                         会话 / 验证 / 评审 / 归档 规程
 │   ├── .learnings/                          经验沉淀模板
 │   └── openspec/templates/                  需求变更文档模板
-├── tier1-direct-optional/.claude/skills/    可选 skill：frontend-design、ui-ux-pro-max、table-lineage
+├── tier1-direct-optional/.claude/skills/    可选 skill：frontend-design、ui-ux-pro-max、table-lineage、jenkins-deploy
 ├── tier2-template/                          带占位符、安装时按项目填好
 │   ├── AGENTS.md、BACKEND_RULES.md、FRONTEND_RULES.md、CUSTOMIZE.md
 │   └── dev.sh、docker-compose.dev.yml

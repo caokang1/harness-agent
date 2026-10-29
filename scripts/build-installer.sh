@@ -53,6 +53,8 @@ cat > "$OUTPUT" <<SCRIPT_EOF
 #
 # 可选参数：
 #   --include-frontend-design   额外安装 frontend-design / ui-ux-pro-max 两个前端 UI 设计 skill
+#   --include-table-lineage     额外安装 table-lineage 库表血缘 skill
+#   --include-jenkins           额外安装 jenkins-deploy Jenkins 发布 skill
 #   --help / -h                 查看完整参数说明
 #
 # 工作原理：

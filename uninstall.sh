@@ -69,6 +69,7 @@ HARNESS_SKILLS=(
   frontend-design
   ui-ux-pro-max
   table-lineage
+  jenkins-deploy
 )
 LEGACY_DIRS=("docs/agents" ".learnings" "openspec/templates")
 LEGACY_FILES=("AGENTS.md" "BACKEND_RULES.md" "FRONTEND_RULES.md" "dev.sh" "docker-compose.dev.yml" "CUSTOMIZE.md")

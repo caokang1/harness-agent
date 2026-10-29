@@ -119,6 +119,7 @@ rm -rf .harness-starter
 |---|---|
 | `--include-frontend-design` | `frontend-design`、`ui-ux-pro-max`（前端界面与 UI/UX 设计） |
 | `--include-table-lineage` | `table-lineage`（库表血缘分析，需 Python 3.11+） |
+| `--include-jenkins` | `jenkins-deploy`（`/jenkins-deploy` 一条命令触发已有的 Jenkins 任务） |
 
 ### 模块分工
 
@@ -252,6 +253,37 @@ python3 .claude/skills/ui-ux-pro-max/scripts/search.py "form validation" --stack
 - 元数据可以用 skill 自带的 SQL 在任意数据库客户端导出成 CSV（MySQL 8 导出的大写表头也能识别），也可以配置只读账号直连；
 - 账号密码只写在本机的 `db.cnf` 里，不要发到对话中；
 - 准确率要用人工核对的标准答案实测，页面会如实标注是否经过测量。
+
+### jenkins-deploy（`--include-jenkins`）
+
+用当前 git 分支触发项目在 Jenkins 上**已有的**任务，不创建也不修改任务。在 Claude Code 里输入一条命令：
+
+```
+/jenkins-deploy                              # 用默认任务
+/jenkins-deploy team/svc-dev deployEnv=test  # 指定任务和参数
+```
+
+AI 会一口气做完下面几步，中间只停一次等你确认：
+
+1. **找任务**：先用命令里指定的；没指定就读仓库根的 `.jenkins-deploy.json`；还没有就按仓库地址自动匹配。
+2. **模拟运行**：分支参数填当前分支，标签参数填当前提交上的标签，其他参数用任务默认值。
+3. **请你确认**：把任务、参数、远端提交、⚠ 警告和确认码整块发给你。有 ✗ 错误时不能触发，比如分支没推送、参数名拼错。
+4. **触发**：你回复"确认"后，用确认码触发。任务、参数或远端提交与确认时有任何不同，都会拒绝触发。
+5. **监控**：在后台监控构建，结束后告诉你结果，并发桌面通知。失败不会自动重试，结束监控也不会停止构建。
+
+需要两份配置：
+
+```bash
+# ~/.config/jenkins-deploy/config.json —— 个人凭据，不进仓库（chmod 600）
+{"url": "https://jenkins.example.com", "user": "<用户名>", "token": "<API Token>"}
+# Token：Jenkins 右上角用户名 → Security → API Token
+# 默认拒绝 http:// 地址；只能用 http 的内网环境，加 "allow_http": true
+
+# .jenkins-deploy.json —— 放在仓库根目录，可以提交，团队共用
+{"job": "team-a/dev/order-service"}
+```
+
+只依赖 Python 3.8+ 标准库。离线自测：`python3 .claude/skills/jenkins-deploy/scripts/run_tests.py`。该 skill 改编自 ABCFed/claude-marketplace（MIT License）。
 
 ### render-graphs.js（随 `writing-skills` 安装）
 
