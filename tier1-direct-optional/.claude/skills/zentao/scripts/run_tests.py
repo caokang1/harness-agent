@@ -3,7 +3,7 @@
 zentao skill 自动化测试
 
 在本机启动一个模拟禅道（REST API v1），覆盖配置校验、登录与令牌、读取任务 / Bug、
-开始任务、钩子计时、完成任务、解决 Bug 和确认码。不连接任何真实服务器。
+开始任务、钩子计时、完成任务（含按历史习惯推荐指派人）、解决 Bug 和确认码。不连接任何真实服务器。
 
 运行：python3 scripts/run_tests.py
 """
@@ -28,6 +28,7 @@ class MockZentao(BaseHTTPRequestHandler):
     posts: list = []
     task = {}
     bug = {}
+    done_tasks = []
 
     def log_message(self, *args):
         pass
@@ -61,6 +62,10 @@ class MockZentao(BaseHTTPRequestHandler):
                                     'verify': '<ul><li>库存为 0 时提示</li></ul>'})
         if path == '/bugs/45':
             return self.reply(200, cls.bug)
+        if path.startswith('/executions/9/tasks?') and 'status=done' in path:
+            if cls.done_tasks is None:
+                return self.reply(403, {'error': 'no priv'})
+            return self.reply(200, {'total': len(cls.done_tasks), 'tasks': cls.done_tasks})
         return self.reply(404, {'error': 'not found'})
 
     def do_POST(self):
@@ -81,7 +86,8 @@ class MockZentao(BaseHTTPRequestHandler):
             cls.task.update(status='doing', left=body['left'], realStarted=body['realStarted'])
             return self.reply(200, cls.task)
         if path == '/tasks/123/finish':
-            cls.task.update(status='done', consumed=cls.task['consumed'] + body['currentConsumed'])
+            cls.task.update(status='done', consumed=cls.task['consumed'] + body['currentConsumed'],
+                            assignedTo=body.get('assignedTo'))
             return self.reply(200, cls.task)
         if path == '/bugs/45/resolve':
             cls.bug.update(status='resolved')
@@ -97,6 +103,7 @@ def main() -> int:
 
     MockZentao.task = {'id': 123, 'name': '实现下单库存校验', 'status': 'wait', 'type': 'devel', 'pri': 2,
                        'estimate': 4, 'consumed': 0, 'left': 0, 'story': 7, 'executionName': '10 月迭代',
+                       'project': 3, 'execution': 9, 'openedBy': {'account': 'pm1', 'realname': '产品一'},
                        'assignedTo': {'account': 'dev', 'realname': '开发'}, 'realStarted': None,
                        'desc': '<p>见需求</p><p><img src="/zentao/file-read-9.png"/></p>'
                                '<table><tr><th>字段</th><th>规则</th></tr>'
@@ -105,6 +112,14 @@ def main() -> int:
     MockZentao.bug = {'id': 45, 'title': '库存为负', 'status': 'active', 'severity': 2, 'pri': 1, 'story': 0,
                       'steps': '<p>[步骤] 连续下单</p><p>[结果] 库存 -1</p>',
                       'openedBy': {'account': 'qa1', 'realname': '测试一'}, 'assignedTo': 'dev'}
+    me = {'account': 'dev', 'realname': '开发'}
+    MockZentao.done_tasks = [
+        {'id': 100, 'finishedBy': me, 'assignedTo': {'account': 'qa2', 'realname': '测试二'}},
+        {'id': 101, 'finishedBy': me, 'assignedTo': {'account': 'qa2', 'realname': '测试二'}},
+        {'id': 102, 'finishedBy': me, 'assignedTo': 'closed'},
+        {'id': 103, 'finishedBy': {'account': 'dev2', 'realname': '开发二'},
+         'assignedTo': {'account': 'qa3', 'realname': '测试三'}},
+    ]
     server = ThreadingHTTPServer(('127.0.0.1', 0), MockZentao)
     threading.Thread(target=server.serve_forever, daemon=True).start()
     url = f'http://127.0.0.1:{server.server_address[1]}/zentao/my.html'
@@ -198,7 +213,22 @@ def main() -> int:
     rc, out, err = run('finish', '--hours', '1.5', '--comment', '完成库存校验')
     check('完成任务先预览，不提交', rc == 0 and '本次工时: 1.5 小时' in out and '确认码' in out
           and len(MockZentao.posts) == posts, out + err)
+    check('没有本地历史时，按本迭代你完成的任务推荐指派人，其他人列为候选',
+          '指派给: 测试二 (qa2)（本迭代你完成的任务）' in out and '测试三 (qa3)（本迭代团队习惯）' in out
+          and '产品一 (pm1)（任务创建人）' in out and 'closed' not in out, out)
     code = code_of(out)
+
+    rc, out, err = run('finish', '--hours', '1.5', '--comment', '完成库存校验', '--assign', '产品一')
+    check('按姓名改指派人后确认码随之变化', rc == 0 and '指派给: 产品一 (pm1)（你指定的）' in out
+          and code_of(out) != code, out + err)
+
+    rc, out, err = run('finish', '--hours', '1.5', '--assign', '路人甲')
+    check('不认识的姓名报错，提示给账号', rc == 1 and '不认识「路人甲」' in err, err)
+
+    MockZentao.done_tasks = None
+    rc, out, err = run('finish', '--hours', '1.5', '--comment', '完成库存校验')
+    check('查不到迭代任务时退回任务创建人，不影响完成', rc == 0 and '指派给: 产品一 (pm1)（任务创建人）' in out, out + err)
+    MockZentao.done_tasks = [{'id': 100, 'finishedBy': me, 'assignedTo': {'account': 'qa2', 'realname': '测试二'}}]
 
     rc, out, err = run('finish', '--hours', '2', '--comment', '完成库存校验', '--confirm', code)
     check('工时改了以后旧确认码失效', rc == 1 and '确认码不一致' in err and len(MockZentao.posts) == posts, err)
@@ -206,8 +236,17 @@ def main() -> int:
     rc, out, err = run('finish', '--hours', '1.5', '--comment', '完成库存校验', '--confirm', code)
     path, body = MockZentao.posts[-1]
     check('确认后完成任务并记录工时',
-          rc == 0 and path == '/tasks/123/finish' and body['currentConsumed'] == 1.5
+          rc == 0 and path == '/tasks/123/finish' and body['currentConsumed'] == 1.5 and body['assignedTo'] == 'qa2'
           and body['realStarted'] and body['finishedDate'] and '完成库存校验' in body['comment'], out + err + str(body))
+
+    MockZentao.task.update(status='doing')
+    rc, out, err = run('finish', '123', '--hours', '1', '--assign', 'pm1')
+    run('finish', '123', '--hours', '1', '--assign', 'pm1', '--confirm', code_of(out))
+    MockZentao.task.update(status='doing')
+    rc, out, err = run('finish', '123', '--hours', '1')
+    check('本人在同一项目的历史选择优先于迭代里的推断',
+          rc == 0 and '指派给: 产品一 (pm1)（历史习惯）' in out and '测试二 (qa2)（历史习惯）' in out, out + err)
+    MockZentao.task.update(status='done')
 
     rc, out, err = run('time', '123')
     check('完成后清除这个任务的计时记录', rc == 0 and '没有记录' in out, out)
@@ -215,8 +254,9 @@ def main() -> int:
     rc, out, err = run('finish', '123', '--hours', '1')
     check('已完成的任务不能再次完成', rc == 1 and '不能完成' in err, err)
 
+    posts = len(MockZentao.posts)
     rc, out, err = run('start', 'bug 45')
-    check('开始处理 Bug 只计时，不改禅道', rc == 0 and len(MockZentao.posts) == posts + 1 and '已开始计时' in out, out + err)
+    check('开始处理 Bug 只计时，不改禅道', rc == 0 and len(MockZentao.posts) == posts and '已开始计时' in out, out + err)
 
     rc, out, err = run('resolve', '--hours', '0.5', '--comment', '修复并发扣减')
     check('解决 Bug 先预览：耗时写进备注，指派回提 Bug 的人',

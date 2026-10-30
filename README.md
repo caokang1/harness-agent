@@ -125,7 +125,7 @@ bash dev.sh check --arch     # 提交前必跑的架构检查
 | `--include-frontend-design` | `frontend-design`、`ui-ux-pro-max` | 生产级前端界面设计；UI/UX 风格、配色、字体的检索和设计方案生成 | Python 3 |
 | `--include-table-lineage` | `table-lineage` | 从 Java / MyBatis 代码加 MySQL 元数据生成库表血缘页面，准确率用人工标准答案实测 | Python 3.11+ |
 | `--include-jenkins` | `jenkins-deploy` | `/jenkins-deploy` 一条命令：按当前分支触发已有的 Jenkins 任务，给你确认后才触发，并在后台监控结果 | Python 3.8+ |
-| `--include-zentao` | `zentao` | `/zentao 编号`：读禅道任务或 Bug，自动累计 AI 工作时间，你确认工时后完成任务或解决 Bug | Python 3.8+ |
+| `--include-zentao` | `zentao` | `/zentao 编号`：读禅道任务或 Bug，自动累计 AI 工作时间，你确认工时（任务还会按你的习惯推荐指派人）后完成任务或解决 Bug | Python 3.8+ |
 
 连接外部系统的 skill（Jenkins、禅道）有几条共同的安全约定：
 
