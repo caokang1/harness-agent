@@ -19,6 +19,7 @@ import re
 import subprocess
 import sys
 import time
+from collections import Counter
 from datetime import datetime
 from html.parser import HTMLParser
 from pathlib import Path
@@ -164,6 +165,7 @@ class Client:
         self.cfg = cfg
         key = hashlib.sha256(f"{cfg.url}|{cfg.account}".encode()).hexdigest()[:12]
         self.token_file = CACHE_DIR / f"token-{key}"
+        self.assignee_file = CACHE_DIR / f"assignees-{key}.json"
         self.token = self.token_file.read_text().strip() if self.token_file.exists() else ''
 
     def login(self) -> None:
@@ -493,6 +495,99 @@ def manage_hooks(action: str, settings: Path) -> None:
 
 
 # ============================================================================
+# 完成任务时的指派人：优先按本人的历史习惯推荐
+# ============================================================================
+
+ASSIGNEE_HISTORY_LIMIT = 200
+
+
+def person(value) -> Tuple[str, str]:
+    """禅道用户字段 -> (账号, 姓名)；接口有时只给账号字符串"""
+    if isinstance(value, dict):
+        return value.get('account') or '', value.get('realname') or value.get('account') or ''
+    return value or '', value or ''
+
+
+def load_assignee_history(client: Client) -> List[Dict]:
+    try:
+        return json.loads(client.assignee_file.read_text(encoding='utf-8'))
+    except (OSError, json.JSONDecodeError):
+        return []
+
+
+def record_assignee(client: Client, task: Dict, account: str, name: str) -> None:
+    history = load_assignee_history(client)
+    history.append({'account': account, 'name': name, 'project': task.get('project'), 'time': now_str()})
+    private_dir(CACHE_DIR)
+    write_private(client.assignee_file, json.dumps(history[-ASSIGNEE_HISTORY_LIMIT:], ensure_ascii=False))
+
+
+def execution_done_tasks(client: Client, task: Dict) -> List[Dict]:
+    """同一迭代里已完成的任务；查不到只影响推荐，不影响完成"""
+    if not task.get('execution'):
+        return []
+    try:
+        data = client.call('GET', f"/executions/{task['execution']}/tasks?status=done&limit=100")
+    except ZentaoError:
+        return []
+    return [t for t in data.get('tasks') or [] if isinstance(t, dict)]
+
+
+def by_habit(people: List[Tuple[str, str]]) -> List[Tuple[str, str]]:
+    """出现次数多的在前，次数相同时最近的在前"""
+    counts = Counter(account for account, _ in people)
+    latest = {account: i for i, (account, _) in enumerate(people)}
+    names = dict(people)
+    return [(a, names[a]) for a in sorted(counts, key=lambda a: (-counts[a], -latest[a]))]
+
+
+def assignee_candidates(client: Client, task: Dict) -> Tuple[List[Tuple[str, str, str]], Dict[str, str]]:
+    """
+    候选指派人 [(账号, 姓名, 来源)]，优先级从高到低：
+    本人在同一项目的历史选择 > 本人在本迭代完成的任务现在指派给谁 > 本人在其他项目的历史选择
+    > 本迭代其他人完成任务后指派给谁 > 任务创建人（禅道的默认值）
+    同时返回见过的人 {账号: 姓名}，用来把用户说的姓名换成账号
+    """
+    me = client.cfg.account
+    history = load_assignee_history(client)
+    done = execution_done_tasks(client, task)
+    same_project = [h.get('project') == task.get('project') for h in history]
+    groups = [
+        ('历史习惯', [(h['account'], h['name']) for h, same in zip(history, same_project) if same]),
+        ('本迭代你完成的任务', [person(t.get('assignedTo')) for t in done if person(t.get('finishedBy'))[0] == me]),
+        ('其他项目的历史习惯', [(h['account'], h['name']) for h, same in zip(history, same_project) if not same]),
+        ('本迭代团队习惯', [person(t.get('assignedTo')) for t in done if person(t.get('finishedBy'))[0] != me]),
+        ('任务创建人', [person(task.get('openedBy'))]),
+    ]
+    known = {a: n for t in done + [task] for a, n in (person(t.get(f)) for f in ('openedBy', 'assignedTo', 'finishedBy'))}
+    candidates, seen = [], {me, 'closed', ''}
+    for source, people in groups:
+        for account, name in by_habit(people):
+            known.setdefault(account, name)
+            if account not in seen:
+                seen.add(account)
+                candidates.append((account, name, source))
+    return candidates, known
+
+
+def pick_assignee(task: Dict, candidates: List[Tuple[str, str, str]], known: Dict[str, str],
+                  wanted: Optional[str]) -> Tuple[str, str, str]:
+    if not wanted:
+        return candidates[0] if candidates else person(task.get('openedBy')) + ('任务创建人',)
+    wanted = wanted.strip()
+    for account, name in known.items():
+        if wanted.lower() == account.lower() or wanted == name:
+            return account, name, '你指定的'
+    if re.fullmatch(r'[A-Za-z0-9_.@-]+', wanted):
+        return wanted, wanted, '你指定的账号，最近的任务里没见过，请核对拼写'
+    raise ZentaoError(f"不认识「{wanted}」：最近的任务里没有这个人，请直接给出他的禅道账号")
+
+
+def fmt_person(account: str, name: str) -> str:
+    return name if name == account else f"{name} ({account})"
+
+
+# ============================================================================
 # 写操作：开始任务 / 完成任务 / 解决 Bug
 # ============================================================================
 
@@ -532,30 +627,39 @@ def comment_html(lines: List[str]) -> str:
     return ''.join(f"<p>{html.escape(line)}</p>" for line in lines if line.strip())
 
 
-def finish(client: Client, task_id: int, hours: float, comment: str, confirm: Optional[str]) -> None:
+def finish(client: Client, task_id: int, hours: float, comment: str, assign: Optional[str],
+           confirm: Optional[str]) -> None:
     task = client.call('GET', f'/tasks/{task_id}')
     if task.get('status') not in ('wait', 'doing', 'pause'):
         raise ZentaoError(f"任务 #{task_id} 当前状态是 {task.get('status')}，不能完成")
-    code = confirm_code(client, 'finish', task_id, hours, comment)
+    candidates, known = assignee_candidates(client, task)
+    account, name, source = pick_assignee(task, candidates, known, assign)
+    code = confirm_code(client, 'finish', task_id, hours, comment + '|' + account)
     if confirm is None:
         print("=" * 60)
         print(f"将完成: 任务 #{task_id} {task.get('name', '')}")
         print(f"本次工时: {hours} 小时（禅道里已消耗 {task.get('consumed', 0)}h，完成后剩余记为 0）")
+        print(f"指派给: {fmt_person(account, name)}（{source}）")
+        others = [c for c in candidates if c[0] != account][:3]
+        if others:
+            print(f"其他候选: {'、'.join(f'{fmt_person(a, n)}（{s}）' for a, n, s in others)}")
         print(f"备注: {comment or '（无）'}")
         print(f"确认码: {code}")
         print("=" * 60)
         return
     if confirm != code:
-        raise ZentaoError("确认码不一致：工时或备注与确认时不同。请重新预览并让用户确认")
+        raise ZentaoError("确认码不一致：工时、备注或指派人与确认时不同。请重新预览并让用户确认")
     real_started = task.get('realStarted') or ''
     if not real_started or real_started.startswith('0000'):
         real_started = now_str()
     client.call('POST', f'/tasks/{task_id}/finish', {
-        'currentConsumed': hours, 'realStarted': real_started, 'finishedDate': now_str(),
+        'currentConsumed': hours, 'assignedTo': account, 'realStarted': real_started, 'finishedDate': now_str(),
         'comment': comment_html([comment]),
     })
+    record_assignee(client, task, account, name)
     clear_item('task', task_id)
-    print(f"✅ 任务 #{task_id} 已完成，记录工时 {hours} 小时  {client.cfg.url}/task-view-{task_id}.html")
+    print(f"✅ 任务 #{task_id} 已完成，记录工时 {hours} 小时，已指派给 {fmt_person(account, name)}  "
+          f"{client.cfg.url}/task-view-{task_id}.html")
 
 
 def resolve(client: Client, bug_id: int, hours: float, comment: str, build: str, confirm: Optional[str]) -> None:
@@ -619,6 +723,7 @@ def main() -> None:
     p.add_argument('ref', nargs='?')
     p.add_argument('--hours', type=float, required=True)
     p.add_argument('--comment', default='')
+    p.add_argument('--assign', help='完成后指派给谁（姓名或禅道账号），默认按历史习惯推荐')
     p.add_argument('--confirm')
     p = sub.add_parser('resolve', help='解决 Bug，耗时写进备注：先预览，确认后带确认码执行')
     p.add_argument('ref', nargs='?')
@@ -668,7 +773,7 @@ def main() -> None:
         kind, item_id = active_or(args.ref)
         if kind != 'task':
             raise ZentaoError(f"{label(kind, item_id)} 不是任务，Bug 请用 resolve")
-        finish(client, item_id, args.hours, args.comment, args.confirm)
+        finish(client, item_id, args.hours, args.comment, args.assign, args.confirm)
     elif args.cmd == 'resolve':
         kind, item_id = active_or(args.ref, 'bug')
         if kind != 'bug':
