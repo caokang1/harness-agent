@@ -5,6 +5,8 @@
 ![platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20WSL-lightgrey)
 ![Claude Code / Cursor](https://img.shields.io/badge/AI-Claude%20Code%20%7C%20Cursor-D97757)
 
+> **apollo 分支**：Apollo 项目定制版在 [`apollo/`](apollo/README.md)，用 `apollo/install.sh` 安装。
+
 一条命令，把一套 **AI 协作开发规范**装进你的 Java 项目：AI 进项目先读的总规则、编码规则、架构检查脚本，以及 20 个工程方法论 skill。装好以后，AI 会按改动大小走不同的流程，改完先检查、再给你验证，**你确认之前不会提交代码**。
 
 适用于 Claude Code、Cursor 等能读取 `AGENTS.md` 和 `.claude/skills/` 的 AI 编程工具。
