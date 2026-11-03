@@ -168,7 +168,7 @@ def http(cfg: Config, method: str, url: str, params: Optional[Dict] = None,
          data: Optional[Dict] = None, timeout: int = 15) -> Response:
     if params:
         url += '?' + urlencode(params)
-    body = urlencode(data or {}).encode('utf-8') if method == 'POST' else None
+    body = urlencode(data or {}, doseq=True).encode('utf-8') if method == 'POST' else None
     request = Request(url, data=body, method=method)
     token = base64.b64encode(f"{cfg.auth[0]}:{cfg.auth[1]}".encode('utf-8')).decode('ascii')
     request.add_header('Authorization', f'Basic {token}')
@@ -477,10 +477,21 @@ def print_plan(cfg: Config, project: Dict, params: Dict[str, str], revisions: Di
 # 构建 API
 # ============================================================================
 
+MULTI_SELECT_TYPES = ('PT_CHECKBOX', 'PT_MULTI_SELECT')
+
+
+def form_values(project: Dict, params: Dict[str, str]) -> Dict:
+    """Extended Choice 多选参数只接受逐项提交（PROJECT_NAME=a&PROJECT_NAME=b），
+    整串 "a,b" 会因不等于任何选项被插件丢成空值，导致只编译不部署"""
+    multi = {p['name'] for p in project['parameters'] if p.get('type') in MULTI_SELECT_TYPES}
+    return {k: [x.strip() for x in v.split(',') if x.strip()] if k in multi else v for k, v in params.items()}
+
+
 def trigger_build(cfg: Config, project: Dict, params: Dict[str, str]) -> int:
     """触发构建，返回队列 ID"""
     endpoint = 'buildWithParameters' if project['parameters'] else 'build'
-    response = http(cfg, 'POST', job_url(cfg, project['full_name']) + endpoint, data=params, timeout=30)
+    response = http(cfg, 'POST', job_url(cfg, project['full_name']) + endpoint,
+                    data=form_values(project, params), timeout=30)
     match = re.search(r'/queue/item/(\d+)', response.headers.get('Location') or '')
     if response.status_code in (200, 201, 302) and match:
         return int(match.group(1))
