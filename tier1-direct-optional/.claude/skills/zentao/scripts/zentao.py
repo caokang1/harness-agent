@@ -10,6 +10,7 @@
 """
 
 import argparse
+import difflib
 import hashlib
 import html
 import json
@@ -334,6 +335,57 @@ def show_bug(client: Client, bug_id: int) -> Dict:
 
 
 # ============================================================================
+# 需求快照：开始时存一份需求原文，之后在设计、实现、完结前比对，需求被改了能立刻发现
+# ============================================================================
+
+def requirement_text(client: Client, kind: str, item_id: int) -> str:
+    """the parts of a task / bug that define what to build: description, linked story spec and acceptance"""
+    base = client.cfg.url
+    item = client.call('GET', f"/{'tasks' if kind == 'task' else 'bugs'}/{item_id}")
+    parts = [f"# {item.get('name') or item.get('title') or ''}",
+             html_to_text(item.get('desc' if kind == 'task' else 'steps', ''), base)]
+    story_id = int(item.get('story') or 0)
+    if story_id:
+        story = client.call('GET', f'/stories/{story_id}')
+        parts += [f"## 关联需求 #{story_id} {story.get('title', '')}", html_to_text(story.get('spec', ''), base),
+                  "## 验收标准", html_to_text(story.get('verify', ''), base)]
+    return '\n\n'.join(parts)
+
+
+def snapshot_path(kind: str, item_id: int) -> Path:
+    return private_dir(CACHE_DIR) / f"req-{item_key(kind, item_id)}.json"
+
+
+def save_snapshot(kind: str, item_id: int, text: str) -> None:
+    write_private(snapshot_path(kind, item_id), json.dumps(
+        {'hash': hashlib.sha256(text.encode()).hexdigest(), 'saved_at': now_str(), 'text': text}, ensure_ascii=False))
+
+
+def check_requirement(client: Client, kind: str, item_id: int, accept: bool) -> bool:
+    """True when the requirement is unchanged since the snapshot (or a first snapshot was just taken)"""
+    text = requirement_text(client, kind, item_id)
+    path = snapshot_path(kind, item_id)
+    if not path.exists():
+        save_snapshot(kind, item_id, text)
+        print(f"✓ {label(kind, item_id)} 还没有需求快照，已保存当前版本作为基准")
+        return True
+    old = json.loads(path.read_text(encoding='utf-8'))
+    if old.get('hash') == hashlib.sha256(text.encode()).hexdigest():
+        print(f"✓ {label(kind, item_id)} 需求自 {old.get('saved_at')} 以来没有变化")
+        return True
+    print(f"⚠ {label(kind, item_id)} 的需求自 {old.get('saved_at')} 以来被修改过：")
+    for line in difflib.unified_diff(old.get('text', '').splitlines(), text.splitlines(),
+                                     '快照', '禅道当前', lineterm='', n=1):
+        print(f"  {line}")
+    if accept:
+        save_snapshot(kind, item_id, text)
+        print("✓ 已把当前版本记为新的快照")
+        return True
+    print("先和用户确认变化对设计 / 实现的影响；确认后用 check --accept 更新快照")
+    return False
+
+
+# ============================================================================
 # 计时：由 Claude Code 钩子在每轮对话开始 / 结束时调用
 # ============================================================================
 
@@ -598,6 +650,7 @@ def start(client: Client, kind: str, item_id: int, left: Optional[float]) -> Non
             raise ZentaoError(f"Bug #{item_id} 当前状态是 {bug.get('status')}，不是激活状态")
         activate('bug', item_id, bug.get('title', ''), '开始处理 Bug')
         print(f"✓ 开始处理 Bug #{item_id} {bug.get('title', '')}，已开始计时")
+        check_requirement(client, 'bug', item_id, accept=False)
         return
 
     task = client.call('GET', f'/tasks/{item_id}')
@@ -608,7 +661,8 @@ def start(client: Client, kind: str, item_id: int, left: Optional[float]) -> Non
             raise ZentaoError(f"任务 #{item_id} 没有预计工时，禅道要求开始时填写预计剩余，请用 --left <小时> 指定")
         action = 'start' if status == 'wait' else 'restart'
         client.call('POST', f'/tasks/{item_id}/{action}',
-                    {'consumed': float(task.get('consumed') or 0), 'left': remain, 'realStarted': now_str()})
+                    {'consumed': float(task.get('consumed') or 0), 'left': remain, 'realStarted': now_str(),
+                     'assignedTo': client.cfg.account})
         print(f"✓ 禅道任务 #{item_id} 已标为进行中（预计剩余 {remain}h）")
     elif status == 'doing':
         print(f"任务 #{item_id} 已经是进行中，不重复开始")
@@ -616,6 +670,7 @@ def start(client: Client, kind: str, item_id: int, left: Optional[float]) -> Non
         raise ZentaoError(f"任务 #{item_id} 当前状态是 {status}，不能开始")
     activate('task', item_id, task.get('name', ''), '开始任务')
     print(f"✓ 已开始计时：任务 #{item_id} {task.get('name', '')}")
+    check_requirement(client, 'task', item_id, accept=False)
 
 
 def confirm_code(client: Client, action: str, item_id: int, hours: float, comment: str) -> str:
@@ -716,6 +771,9 @@ def main() -> None:
     p = sub.add_parser('start', help='开始任务（禅道标为进行中）或开始处理 Bug，并开始计时')
     p.add_argument('ref')
     p.add_argument('--left', type=float, help='任务没有预计工时时，指定预计剩余小时数')
+    p = sub.add_parser('check', help='对比需求和开始时的快照，需求被改过就列出差异并以状态码 2 退出')
+    p.add_argument('ref', nargs='?')
+    p.add_argument('--accept', action='store_true', help='用户确认过变化后，把当前版本记为新快照')
     p = sub.add_parser('time', help='查看累计的 AI 工作时间')
     p.add_argument('ref', nargs='?')
     sub.add_parser('pause', help='停止计时（不改禅道），切换到别的事情时用')
@@ -769,6 +827,9 @@ def main() -> None:
         (show_task if kind == 'task' else show_bug)(client, item_id)
     elif args.cmd == 'start':
         start(client, *parse_ref(args.ref), args.left)
+    elif args.cmd == 'check':
+        if not check_requirement(client, *active_or(args.ref), args.accept):
+            sys.exit(2)
     elif args.cmd == 'finish':
         kind, item_id = active_or(args.ref)
         if kind != 'task':
